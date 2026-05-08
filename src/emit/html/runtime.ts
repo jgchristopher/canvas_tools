@@ -128,8 +128,56 @@ export const HTML_RUNTIME = `
 		active = null;
 	});
 
-	// ── Edge updater (stub; real implementation in next task) ────────────────
-	function scheduleEdgeUpdate(_nodeId) { /* implemented in next task */ }
+	// ── Edge updater ─────────────────────────────────────────────────────────
+	var pendingEdges = {};
+	var rafScheduled = false;
+	function scheduleEdgeUpdate(nodeId) {
+		var list = edgesByNode[nodeId] || [];
+		for (var i = 0; i < list.length; i++) pendingEdges[list[i].id] = list[i];
+		if (rafScheduled) return;
+		rafScheduled = true;
+		requestAnimationFrame(flushEdgeUpdates);
+	}
+	function flushEdgeUpdates() {
+		rafScheduled = false;
+		for (var id in pendingEdges) {
+			if (Object.prototype.hasOwnProperty.call(pendingEdges, id)) updateEdge(pendingEdges[id]);
+		}
+		pendingEdges = {};
+	}
+	function updateEdge(edge) {
+		var from = nodeMap[edge.from.node];
+		var to = nodeMap[edge.to.node];
+		if (!from || !to) return;
+		var a = anchor(from, edge.from.side);
+		var b = anchor(to, edge.to.side);
+		var path = bezier(a, edge.from.side, b, edge.to.side);
+		var pathEl = canvas.querySelector('.ct-edges path[data-id="' + cssEscape(edge.id) + '"]');
+		var labelEl = canvas.querySelector('.ct-edges text[data-id="' + cssEscape(edge.id) + '"]');
+		if (pathEl) pathEl.setAttribute('d', path.d);
+		if (labelEl) { labelEl.setAttribute('x', String(path.midX)); labelEl.setAttribute('y', String(path.midY)); }
+	}
+	function anchor(n, side) {
+		var rx = n.x - bounds.x, ry = n.y - bounds.y;
+		if (side === 'top')    return { x: rx + n.w / 2, y: ry };
+		if (side === 'right')  return { x: rx + n.w,     y: ry + n.h / 2 };
+		if (side === 'bottom') return { x: rx + n.w / 2, y: ry + n.h };
+		return                       { x: rx,            y: ry + n.h / 2 };
+	}
+	function bezier(a, aSide, b, bSide) {
+		var off = Math.max(40, Math.hypot(b.x - a.x, b.y - a.y) * 0.3);
+		var c1 = ctrl(a, aSide, off), c2 = ctrl(b, bSide, off);
+		var midX = (a.x + 3*c1.x + 3*c2.x + b.x) / 8;
+		var midY = (a.y + 3*c1.y + 3*c2.y + b.y) / 8;
+		return { d: 'M ' + a.x + ' ' + a.y + ' C ' + c1.x + ' ' + c1.y + ', ' + c2.x + ' ' + c2.y + ', ' + b.x + ' ' + b.y, midX: midX, midY: midY };
+	}
+	function ctrl(p, side, off) {
+		if (side === 'top')    return { x: p.x,        y: p.y - off };
+		if (side === 'right')  return { x: p.x + off,  y: p.y };
+		if (side === 'bottom') return { x: p.x,        y: p.y + off };
+		return                       { x: p.x - off,  y: p.y };
+	}
+	function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; }); }
 	var lastTouchDist = null, lastTouchMid = null;
 	viewport.addEventListener('touchstart', function (e) {
 		if (e.touches.length === 1) {
