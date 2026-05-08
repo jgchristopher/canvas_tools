@@ -1,82 +1,110 @@
 export const HTML_RUNTIME = `
 (function () {
+	// ── State hydration ──────────────────────────────────────────────────────
 	var viewport = document.querySelector('.ct-viewport');
 	var canvas = document.querySelector('.ct-canvas');
 	if (!viewport || !canvas) return;
 
 	var bounds = JSON.parse(canvas.getAttribute('data-bounds') || '{"x":0,"y":0,"w":0,"h":0}');
-	var state = { tx: 0, ty: 0, scale: 1 };
-	var minScale = 0.1;
-	var maxScale = 4;
+	var interactive = canvas.getAttribute('data-interactive') === 'true';
+	var stateEl = document.getElementById('ct-state');
+	var state = stateEl ? JSON.parse(stateEl.textContent || '{}') : { nodes: [], edges: [] };
+	var nodeMap = {};
+	for (var i = 0; i < (state.nodes || []).length; i++) nodeMap[state.nodes[i].id] = state.nodes[i];
 
-	function apply() {
-		canvas.style.transform = 'translate(' + state.tx + 'px,' + state.ty + 'px) scale(' + state.scale + ')';
+	// Index edges by node for fast lookup during drag/resize
+	var edgesByNode = {};
+	for (var j = 0; j < (state.edges || []).length; j++) {
+		var e = state.edges[j];
+		(edgesByNode[e.from.node] = edgesByNode[e.from.node] || []).push(e);
+		(edgesByNode[e.to.node] = edgesByNode[e.to.node] || []).push(e);
 	}
 
+	// Snapshot of the original layout for reset
+	var original = JSON.parse(JSON.stringify(state));
+
+	// ── Pan / zoom (existing behaviour) ──────────────────────────────────────
+	var view = { tx: 0, ty: 0, scale: 1 };
+	var minScale = 0.1, maxScale = 4;
+	function applyView() {
+		canvas.style.transform = 'translate(' + view.tx + 'px,' + view.ty + 'px) scale(' + view.scale + ')';
+	}
 	function fit() {
 		if (!bounds.w || !bounds.h) return;
 		var pad = 40;
 		var sx = (viewport.clientWidth - pad * 2) / bounds.w;
 		var sy = (viewport.clientHeight - pad * 2) / bounds.h;
 		var s = Math.min(sx, sy, 1);
-		state.scale = s;
-		state.tx = pad - bounds.x * s + (viewport.clientWidth - pad * 2 - bounds.w * s) / 2;
-		state.ty = pad - bounds.y * s + (viewport.clientHeight - pad * 2 - bounds.h * s) / 2;
-		apply();
+		view.scale = s;
+		view.tx = pad - bounds.x * s + (viewport.clientWidth - pad * 2 - bounds.w * s) / 2;
+		view.ty = pad - bounds.y * s + (viewport.clientHeight - pad * 2 - bounds.h * s) / 2;
+		applyView();
 	}
-
 	function zoomAt(clientX, clientY, factor) {
-		var next = Math.max(minScale, Math.min(maxScale, state.scale * factor));
-		var actualFactor = next / state.scale;
-		state.tx = clientX - (clientX - state.tx) * actualFactor;
-		state.ty = clientY - (clientY - state.ty) * actualFactor;
-		state.scale = next;
-		apply();
+		var next = Math.max(minScale, Math.min(maxScale, view.scale * factor));
+		var actual = next / view.scale;
+		view.tx = clientX - (clientX - view.tx) * actual;
+		view.ty = clientY - (clientY - view.ty) * actual;
+		view.scale = next;
+		applyView();
 	}
-
 	viewport.addEventListener('wheel', function (e) {
 		e.preventDefault();
-		var factor = Math.exp(-e.deltaY * 0.0015);
-		zoomAt(e.clientX, e.clientY, factor);
+		zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
 	}, { passive: false });
 
-	var dragging = false;
-	var startX = 0;
-	var startY = 0;
-	var startTx = 0;
-	var startTy = 0;
-	viewport.addEventListener('mousedown', function (e) {
-		var target = e.target;
-		while (target && target !== viewport) {
-			if (target.tagName === 'A' || target.tagName === 'BUTTON') return;
-			target = target.parentNode;
+	// ── Hit testing ──────────────────────────────────────────────────────────
+	function hitTest(target) {
+		var el = target;
+		while (el && el !== viewport) {
+			if (el.tagName === 'A') return { kind: 'link' };
+			if (el.classList && el.classList.contains('ct-handle')) {
+				var nodeEl = el.parentElement;
+				var nodeId = nodeEl && nodeEl.getAttribute('data-id');
+				if (nodeId) return { kind: 'resize', nodeId: nodeId, anchor: el.getAttribute('data-resize'), nodeEl: nodeEl };
+			}
+			if (el.classList && el.classList.contains('ct-node') && !el.classList.contains('ct-node-group')) {
+				var id = el.getAttribute('data-id');
+				if (id) return { kind: 'move', nodeId: id, nodeEl: el };
+			}
+			el = el.parentElement;
 		}
+		return { kind: 'pan' };
+	}
+
+	// Helpers exposed for the next runtime sections
+	window.__ctRuntime = { state: state, nodeMap: nodeMap, edgesByNode: edgesByNode, original: original, view: view, viewport: viewport, canvas: canvas, hitTest: hitTest, interactive: interactive, applyView: applyView, fit: fit, zoomAt: zoomAt };
+
+	// ── Drag (pan placeholder; node move added next task) ────────────────────
+	var dragging = false;
+	var startX = 0, startY = 0, startTx = 0, startTy = 0;
+	viewport.addEventListener('mousedown', function (e) {
+		if (e.button !== 0) return;
+		var hit = hitTest(e.target);
+		if (hit.kind !== 'pan') return;
 		dragging = true;
-		startX = e.clientX;
-		startY = e.clientY;
-		startTx = state.tx;
-		startTy = state.ty;
+		startX = e.clientX; startY = e.clientY;
+		startTx = view.tx; startTy = view.ty;
 		viewport.classList.add('ct-panning');
 	});
 	window.addEventListener('mousemove', function (e) {
 		if (!dragging) return;
-		state.tx = startTx + (e.clientX - startX);
-		state.ty = startTy + (e.clientY - startY);
-		apply();
+		view.tx = startTx + (e.clientX - startX);
+		view.ty = startTy + (e.clientY - startY);
+		applyView();
 	});
 	window.addEventListener('mouseup', function () {
 		dragging = false;
 		viewport.classList.remove('ct-panning');
 	});
-
-	var lastTouchDist = null;
-	var lastTouchMid = null;
+	var lastTouchDist = null, lastTouchMid = null;
 	viewport.addEventListener('touchstart', function (e) {
 		if (e.touches.length === 1) {
+			var hit = hitTest(e.target);
+			if (hit.kind !== 'pan') return;
 			startX = e.touches[0].clientX;
 			startY = e.touches[0].clientY;
-			startTx = state.tx;
-			startTy = state.ty;
+			startTx = view.tx; startTy = view.ty;
 			dragging = true;
 		} else if (e.touches.length === 2) {
 			dragging = false;
@@ -86,16 +114,16 @@ export const HTML_RUNTIME = `
 	}, { passive: true });
 	viewport.addEventListener('touchmove', function (e) {
 		if (e.touches.length === 1 && dragging) {
-			state.tx = startTx + (e.touches[0].clientX - startX);
-			state.ty = startTy + (e.touches[0].clientY - startY);
-			apply();
+			view.tx = startTx + (e.touches[0].clientX - startX);
+			view.ty = startTy + (e.touches[0].clientY - startY);
+			applyView();
 		} else if (e.touches.length === 2 && lastTouchDist !== null && lastTouchMid !== null) {
 			var dist = touchDistance(e.touches);
 			var mid = touchMidpoint(e.touches);
 			zoomAt(mid.x, mid.y, dist / lastTouchDist);
-			state.tx += mid.x - lastTouchMid.x;
-			state.ty += mid.y - lastTouchMid.y;
-			apply();
+			view.tx += mid.x - lastTouchMid.x;
+			view.ty += mid.y - lastTouchMid.y;
+			applyView();
 			lastTouchDist = dist;
 			lastTouchMid = mid;
 		}
@@ -105,15 +133,10 @@ export const HTML_RUNTIME = `
 		lastTouchDist = null;
 		lastTouchMid = null;
 	});
-	function touchDistance(t) {
-		var dx = t[0].clientX - t[1].clientX;
-		var dy = t[0].clientY - t[1].clientY;
-		return Math.sqrt(dx * dx + dy * dy);
-	}
-	function touchMidpoint(t) {
-		return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
-	}
+	function touchDistance(t) { var dx = t[0].clientX - t[1].clientX; var dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx * dx + dy * dy); }
+	function touchMidpoint(t) { return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 }; }
 
+	// ── Toolbar (zoom + fit) ─────────────────────────────────────────────────
 	var toolbar = document.createElement('div');
 	toolbar.className = 'ct-toolbar';
 	toolbar.innerHTML =
