@@ -48,7 +48,8 @@ function renderStateSidecar(model: CanvasModel): string {
 		})),
 		bounds: model.bounds,
 	};
-	return `<script type="application/json" id="ct-state">${JSON.stringify(state)}</script>`;
+	const json = JSON.stringify(state).replace(/<\//g, "<\\/");
+	return `<script type="application/json" id="ct-state">${json}</script>`;
 }
 
 function weightFor(node: CanvasNode): number {

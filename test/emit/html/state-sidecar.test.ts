@@ -51,6 +51,34 @@ describe("state sidecar", () => {
 
 	it("adds data-id to edge paths and labels for runtime addressing", () => {
 		const out = renderModelToHtml(model, { imageHref: () => "", interactive: true });
-		expect(out.body).toContain('data-id="e1"');
+		expect(out.body).toContain('<path data-id="e1"');
+		expect(out.body).toContain('<text data-id="e1"');
+	});
+
+	it("escapes </ inside the JSON sidecar so the script element cannot be closed prematurely", () => {
+		const dangerous: TextNode = {
+			kind: "text",
+			id: "x</script>y",
+			x: 0,
+			y: 0,
+			w: 100,
+			h: 100,
+			html: "",
+			rawMarkdown: "",
+		};
+		const danger: CanvasModel = {
+			source: {} as unknown as CanvasModel["source"],
+			nodes: [dangerous],
+			edges: [],
+			bounds: { x: 0, y: 0, w: 100, h: 100 },
+			assets: [],
+		};
+		const out = renderModelToHtml(danger, { imageHref: () => "", interactive: true });
+		// extract the script content and verify the id is escaped
+		const scriptMatch = /<script type="application\/json" id="ct-state">([\s\S]+?)<\/script>/.exec(out.body);
+		expect(scriptMatch).not.toBeNull();
+		const state = JSON.parse(scriptMatch?.[1] ?? "{}");
+		// verify the dangerous string is preserved correctly after round-trip
+		expect(state.nodes[0]?.id).toBe("x</script>y");
 	});
 });
