@@ -35,10 +35,9 @@ npm run build
 
 ## Linting
 
-- To use eslint install eslint from terminal: `npm install -g eslint`
-- To use eslint to analyze this project use this command: `eslint main.ts`
-- eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
+- `npm run lint` — runs eslint with `obsidianmd/recommended`. Run before commit.
+- `obsidianmd/ui/sentence-case` flags lowercase brand/acronym tokens (`.html`, `.excalidraw`, `markdown`). Wrap such tokens in backticks inside UI strings to skip the rule.
+- `obsidianmd/no-static-styles-assignment` forbids `el.style.foo = "..."`. Use class names and put the rules in `styles.css` (or the embedded export stylesheet at `src/emit/html/styles.ts`).
 
 ## File & folder conventions
 
@@ -61,6 +60,8 @@ npm run build
     types.ts         # TypeScript interfaces and types
   ```
 - **Do not commit build artifacts**: Never commit `node_modules/`, `main.js`, or other generated files to version control.
+- **Do not commit `data.json`**: it stores the user's local plugin settings (already gitignored).
+- Design docs live under `docs/superpowers/specs/`, implementation plans under `docs/superpowers/plans/`. Workflow: brainstorming → writing-plans → subagent-driven-development.
 - Keep the plugin small. Avoid large dependencies. Prefer browser-compatible packages.
 - Generated output should be placed at the plugin root or `dist/` depending on your build setup. Release artifacts must end up at the top level of the plugin folder in the vault (`main.js`, `manifest.json`, `styles.css`).
 
@@ -80,6 +81,8 @@ npm run build
 
 ## Testing
 
+- `npm test` — runs the vitest suite. Tests live in `test/` mirroring `src/`. Use `test/stubs/obsidian.ts` for any test whose module graph touches the obsidian runtime.
+- `@types/node` is pinned to `^20.x` (vitest 2.x requires Node types ≥18). Do not downgrade.
 - Manual install for testing: copy `main.js`, `manifest.json`, `styles.css` (if any) to:
   ```
   <Vault>/.obsidian/plugins/<plugin-id>/
@@ -241,6 +244,20 @@ this.registerInterval(window.setInterval(() => { /* ... */ }, 1000));
 - Commands not appearing: verify `addCommand` runs after `onload` and IDs are unique.
 - Settings not persisting: ensure `loadData`/`saveData` are awaited and you re-render the UI after changes.
 - Mobile-only issues: confirm you're not using desktop-only APIs; check `isDesktopOnly` and adjust.
+
+## HTML export runtime (gotchas)
+
+- `src/emit/html/runtime.ts` exports `HTML_RUNTIME` as a backticked template literal containing JS source. The string passes through TWO escape passes: TS template literal evaluation when the plugin loads, then browser JS parsing inside the embedded `<script>`. To get one literal backslash in the runtime regex/string, write FOUR source backslashes.
+- `main.js` holds the *unevaluated* template literal. Grepping `main.js` for backslash counts is misleading. Use `test/emit/html/runtime-parse.test.ts` (it parses the runtime via `new Function`) to catch escape regressions in CI.
+- The bezier math in `src/emit/html/runtime.ts` (client-side JS string) is intentionally duplicated from `src/emit/html/edge-geometry.ts` (server-side TS module) — the runtime cannot import the TS module. If you change one, change both.
+- JSON embedded in `<script type="application/json">` must escape `</` to `<\/` to prevent malicious labels from closing the script element. See `renderStateSidecar` in `src/emit/html/renderer.ts`.
+- Node's `path.join` does NOT expand `~`. Expand via `os.homedir()` for user-typed absolute paths (see `expandHome` in `src/utils/fs.ts`).
+
+## Excalidraw export (gotchas)
+
+- Arrow bindings are bidirectional. The arrow needs `startBinding`/`endBinding` referencing the shape AND the shape needs `boundElements: [{id: arrowId, type: "arrow"}]`. Asymmetric registration produces unattached arrow endpoints in the Excalidraw view.
+- The Obsidian Excalidraw `.md` wrapper must NOT include a `# Excalidraw Data` heading. That triggers the plugin's stricter parser which then requires `## Text Elements`, `## Element Links`, `## Embedded Files` sub-headings. Match `src/emit/excalidraw/wrapper.ts` exactly: frontmatter → warning blurb → `## Drawing` → ```json fence → trailing `%%`.
+- Excalidraw text does NOT render markdown. Use `renderTextForExcalidraw` (in `src/emit/excalidraw/mapping.ts`) to either strip syntax (default) or preserve raw source.
 
 ## References
 
