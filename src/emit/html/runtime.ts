@@ -75,28 +75,61 @@ export const HTML_RUNTIME = `
 	// Helpers exposed for the next runtime sections
 	window.__ctRuntime = { state: state, nodeMap: nodeMap, edgesByNode: edgesByNode, original: original, view: view, viewport: viewport, canvas: canvas, hitTest: hitTest, interactive: interactive, applyView: applyView, fit: fit, zoomAt: zoomAt };
 
-	// ── Drag (pan placeholder; node move added next task) ────────────────────
+	// ── Drag (pan + node move) ───────────────────────────────────────────────
+	var DRAG_THRESHOLD = 3;
+	var active = null;
+	// Touch section below reuses these vars for touch pan
 	var dragging = false;
 	var startX = 0, startY = 0, startTx = 0, startTy = 0;
+	function startActive(target, e) {
+		var hit = hitTest(target);
+		if (hit.kind === 'link') return null;
+		return { hit: hit, startX: e.clientX, startY: e.clientY, panTx: view.tx, panTy: view.ty, committed: false };
+	}
 	viewport.addEventListener('mousedown', function (e) {
 		if (e.button !== 0) return;
-		var hit = hitTest(e.target);
-		if (hit.kind !== 'pan') return;
-		dragging = true;
-		startX = e.clientX; startY = e.clientY;
-		startTx = view.tx; startTy = view.ty;
-		viewport.classList.add('ct-panning');
+		active = startActive(e.target, e);
 	});
 	window.addEventListener('mousemove', function (e) {
-		if (!dragging) return;
-		view.tx = startTx + (e.clientX - startX);
-		view.ty = startTy + (e.clientY - startY);
-		applyView();
+		if (!active) return;
+		var dx = e.clientX - active.startX;
+		var dy = e.clientY - active.startY;
+		if (!active.committed) {
+			if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+			active.committed = true;
+			if (active.hit.kind === 'move') {
+				active.startNode = { x: nodeMap[active.hit.nodeId].x, y: nodeMap[active.hit.nodeId].y };
+				active.hit.nodeEl.classList.add('ct-dragging');
+			} else if (active.hit.kind === 'pan') {
+				viewport.classList.add('ct-panning');
+			}
+		}
+		if (!interactive && active.hit.kind !== 'pan') return;
+		if (active.hit.kind === 'pan') {
+			view.tx = active.panTx + dx;
+			view.ty = active.panTy + dy;
+			applyView();
+			return;
+		}
+		if (active.hit.kind === 'move') {
+			var n = nodeMap[active.hit.nodeId];
+			n.x = active.startNode.x + dx / view.scale;
+			n.y = active.startNode.y + dy / view.scale;
+			active.hit.nodeEl.style.left = (n.x - bounds.x) + 'px';
+			active.hit.nodeEl.style.top = (n.y - bounds.y) + 'px';
+			scheduleEdgeUpdate(active.hit.nodeId);
+		}
 	});
 	window.addEventListener('mouseup', function () {
-		dragging = false;
-		viewport.classList.remove('ct-panning');
+		if (active && active.committed) {
+			if (active.hit.kind === 'move') active.hit.nodeEl.classList.remove('ct-dragging');
+			if (active.hit.kind === 'pan') viewport.classList.remove('ct-panning');
+		}
+		active = null;
 	});
+
+	// ── Edge updater (stub; real implementation in next task) ────────────────
+	function scheduleEdgeUpdate(_nodeId) { /* implemented in next task */ }
 	var lastTouchDist = null, lastTouchMid = null;
 	viewport.addEventListener('touchstart', function (e) {
 		if (e.touches.length === 1) {
