@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorPoint, bezierPath } from "../../../src/emit/html/edge-geometry";
+import { anchorPoint, bezierPath, controlPoint } from "../../../src/emit/html/edge-geometry";
 
 describe("anchorPoint", () => {
 	const node = { x: 10, y: 20, w: 100, h: 80 };
@@ -42,5 +42,25 @@ describe("bezierPath", () => {
 		const path = bezierPath(a, "bottom", b, "top");
 		// bottom-side control point sits below a; top-side control point sits above b
 		expect(path.d).toMatch(/M 0 0 C 0 \d+(\.\d+)?, 0 -?\d+(\.\d+)?, 0 100/);
+	});
+});
+
+describe("controlPoint", () => {
+	const p = { x: 100, y: 100 };
+
+	it("offsets a top-side control point upward (negative y)", () => {
+		expect(controlPoint(p, "top", 40)).toEqual({ x: 100, y: 60 });
+	});
+
+	it("offsets a right-side control point to the right (positive x)", () => {
+		expect(controlPoint(p, "right", 40)).toEqual({ x: 140, y: 100 });
+	});
+
+	it("offsets a bottom-side control point downward (positive y)", () => {
+		expect(controlPoint(p, "bottom", 40)).toEqual({ x: 100, y: 140 });
+	});
+
+	it("offsets a left-side control point to the left (negative x)", () => {
+		expect(controlPoint(p, "left", 40)).toEqual({ x: 60, y: 100 });
 	});
 });
