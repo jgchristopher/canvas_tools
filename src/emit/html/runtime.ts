@@ -186,7 +186,7 @@ export const HTML_RUNTIME = `
 		if (side === 'bottom') return { x: p.x,        y: p.y + off };
 		return                       { x: p.x - off,  y: p.y };
 	}
-	function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; }); }
+	function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\\\' + c; }); }
 	function resetLayout() {
 		var ids = [];
 		for (var i = 0; i < original.nodes.length; i++) {

@@ -51,23 +51,35 @@ export function createAbsoluteWriter(root: string): OutputWriter {
 		join: (...parts: string[]) => string;
 		dirname: (p: string) => string;
 	};
+	type OsModule = {
+		homedir: () => string;
+	};
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const fs = require("fs") as FsModule;
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const path = require("path") as PathModule;
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const os = require("os") as OsModule;
+	const expandedRoot = expandHome(root, os.homedir());
 	return {
 		async writeText(relativePath, contents) {
-			const full = path.join(root, relativePath);
+			const full = path.join(expandedRoot, relativePath);
 			await fs.promises.mkdir(path.dirname(full), { recursive: true });
 			await fs.promises.writeFile(full, contents);
 		},
 		async writeBinary(relativePath, contents) {
-			const full = path.join(root, relativePath);
+			const full = path.join(expandedRoot, relativePath);
 			await fs.promises.mkdir(path.dirname(full), { recursive: true });
 			await fs.promises.writeFile(full, new Uint8Array(contents));
 		},
 		rootDisplay() {
-			return root;
+			return expandedRoot;
 		},
 	};
+}
+
+function expandHome(input: string, home: string): string {
+	if (input === "~") return home;
+	if (input.startsWith("~/")) return `${home}${input.slice(1)}`;
+	return input;
 }
