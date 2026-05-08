@@ -69,6 +69,16 @@ export class CanvasToolsSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Interactive HTML output")
+			.setDesc("Allow viewers to drag and resize nodes in the exported HTML. Reload restores the original layout.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.htmlInteractive).onChange(async (value) => {
+					this.plugin.settings.htmlInteractive = value;
+					await this.plugin.saveSettings();
+				}),
+			);
+
+		new Setting(containerEl)
 			.setName("Fetch link previews")
 			.setDesc("Fetch og:image and metadata for URL nodes during export. The only network request the plugin makes; off by default.")
 			.addToggle((t) =>

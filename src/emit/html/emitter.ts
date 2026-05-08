@@ -11,6 +11,7 @@ export interface HtmlExportOptions {
 	packaging?: HtmlPackaging;
 	outputPath?: string;
 	outputPathMode?: OutputPathMode;
+	interactive?: boolean;
 }
 
 export interface HtmlExportResult {
@@ -38,15 +39,16 @@ export async function exportCanvasToHtml(
 	const model = await buildCanvasModel(file, deps);
 	const slug = safeFileSlug(file.name);
 	const title = file.basename;
+	const interactive = opts.interactive ?? deps.settings.htmlInteractive;
 	if (packaging === "folder") {
-		const result = await packageAsFolder(model, writer, slug, title);
+		const result = await packageAsFolder(model, writer, slug, title, interactive);
 		return {
 			absolutePath: joinForDisplay(writer, result.indexPath, resolved.mode),
 			packaging,
 			mode: resolved.mode,
 		};
 	}
-	const result = await packageAsSingleFile(model, writer, `${slug}.html`, title);
+	const result = await packageAsSingleFile(model, writer, `${slug}.html`, title, interactive);
 	return {
 		absolutePath: joinForDisplay(writer, result.filePath, resolved.mode),
 		packaging,

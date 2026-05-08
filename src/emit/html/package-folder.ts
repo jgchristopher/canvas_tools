@@ -13,10 +13,12 @@ export async function packageAsFolder(
 	writer: OutputWriter,
 	folderName: string,
 	title: string,
+	interactive: boolean,
 ): Promise<FolderPackageResult> {
 	const imagePathFor = (assetId: string, ext: string): string => `${folderName}/assets/images/${assetId}.${ext}`;
 	const rendered = renderModelToHtml(model, {
 		imageHref: (asset) => `assets/images/${asset.id}.${guessExt(asset.mime)}`,
+		interactive,
 	});
 	for (const id of rendered.assetIds) {
 		const asset = model.assets.find((a) => a.id === id);

@@ -13,6 +13,7 @@ export async function packageAsSingleFile(
 	writer: OutputWriter,
 	fileName: string,
 	title: string,
+	interactive: boolean,
 ): Promise<SinglePackageResult> {
 	const dataUriCache = new Map<string, string>();
 	const rendered = renderModelToHtml(model, {
@@ -23,6 +24,7 @@ export async function packageAsSingleFile(
 			dataUriCache.set(asset.id, uri);
 			return uri;
 		},
+		interactive,
 	});
 	const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${HTML_STYLES}</style></head><body><div class="ct-viewport">${rendered.body}</div><script>${HTML_RUNTIME}</script></body></html>`;

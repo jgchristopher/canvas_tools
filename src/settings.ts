@@ -10,6 +10,7 @@ export interface CanvasToolsSettings {
 	defaultExcalidrawMarkdown: ExcalidrawMarkdown;
 	defaultExcalidrawFormat: ExcalidrawFormat;
 	fetchLinkPreviews: boolean;
+	htmlInteractive: boolean;
 	openHtmlAfterExport: boolean;
 	linkPreviewCache: Record<string, LinkPreviewCacheEntry>;
 }
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: CanvasToolsSettings = {
 	defaultExcalidrawMarkdown: "strip",
 	defaultExcalidrawFormat: "obsidian-md",
 	fetchLinkPreviews: false,
+	htmlInteractive: true,
 	openHtmlAfterExport: true,
 	linkPreviewCache: {},
 };

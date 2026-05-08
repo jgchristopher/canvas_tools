@@ -19,6 +19,7 @@ interface DraftOptions {
 	outputPath: string;
 	outputPathMode: OutputPathMode;
 	openAfterExport: boolean;
+	interactive: boolean;
 }
 
 export class ExportModal extends Modal {
@@ -41,6 +42,7 @@ export class ExportModal extends Modal {
 			outputPath: s.defaultOutputPath,
 			outputPathMode: s.outputPathMode,
 			openAfterExport: s.openHtmlAfterExport,
+			interactive: s.htmlInteractive,
 		};
 	}
 
@@ -89,6 +91,14 @@ export class ExportModal extends Modal {
 				.addToggle((t) =>
 					t.setValue(this.draft.openAfterExport).onChange((value) => {
 						this.draft.openAfterExport = value;
+					}),
+				);
+			new Setting(contentEl)
+				.setName("Interactive output")
+				.setDesc("Drag and resize nodes in the browser. Reload restores the original layout.")
+				.addToggle((t) =>
+					t.setValue(this.draft.interactive).onChange((value) => {
+						this.draft.interactive = value;
 					}),
 				);
 		} else {
@@ -180,6 +190,7 @@ export class ExportModal extends Modal {
 				packaging: this.draft.packaging,
 				outputPath: this.draft.outputPath,
 				outputPathMode: this.draft.outputPathMode,
+				interactive: this.draft.interactive,
 			});
 			return result.absolutePath;
 		}
