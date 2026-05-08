@@ -119,6 +119,17 @@ export const HTML_RUNTIME = `
 			active.hit.nodeEl.style.top = (n.y - bounds.y) + 'px';
 			scheduleEdgeUpdate(active.hit.nodeId);
 		}
+		if (active.hit.kind === 'resize') {
+			var rn = nodeMap[active.hit.nodeId];
+			if (!active.startResize) active.startResize = { x: rn.x, y: rn.y, w: rn.w, h: rn.h };
+			var resized = applyResize(active.startResize, active.hit.anchor, dx / view.scale, dy / view.scale);
+			rn.x = resized.x; rn.y = resized.y; rn.w = resized.w; rn.h = resized.h;
+			active.hit.nodeEl.style.left = (rn.x - bounds.x) + 'px';
+			active.hit.nodeEl.style.top = (rn.y - bounds.y) + 'px';
+			active.hit.nodeEl.style.width = rn.w + 'px';
+			active.hit.nodeEl.style.height = rn.h + 'px';
+			scheduleEdgeUpdate(active.hit.nodeId);
+		}
 	});
 	window.addEventListener('mouseup', function () {
 		if (active && active.committed) {
@@ -178,6 +189,15 @@ export const HTML_RUNTIME = `
 		return                       { x: p.x - off,  y: p.y };
 	}
 	function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; }); }
+	function applyResize(start, anchor, dx, dy) {
+		var MIN = 40;
+		var x = start.x, y = start.y, w = start.w, h = start.h;
+		if (anchor.indexOf('w') >= 0) { var newW = Math.max(MIN, w - dx); x = x + (w - newW); w = newW; }
+		if (anchor.indexOf('e') >= 0) { w = Math.max(MIN, w + dx); }
+		if (anchor.indexOf('n') >= 0) { var newH = Math.max(MIN, h - dy); y = y + (h - newH); h = newH; }
+		if (anchor.indexOf('s') >= 0) { h = Math.max(MIN, h + dy); }
+		return { x: x, y: y, w: w, h: h };
+	}
 	var lastTouchDist = null, lastTouchMid = null;
 	viewport.addEventListener('touchstart', function (e) {
 		if (e.touches.length === 1) {
