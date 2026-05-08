@@ -66,4 +66,18 @@ html, body { margin: 0; padding: 0; height: 100%; background: var(--ct-bg); colo
 .ct-toolbar { position: fixed; bottom: 16px; right: 16px; display: flex; gap: 4px; background: var(--ct-surface); border: 1px solid var(--ct-border); border-radius: 8px; padding: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 10; }
 .ct-toolbar button { width: 32px; height: 32px; border: 0; background: transparent; color: var(--ct-text); border-radius: 6px; cursor: pointer; font-size: 16px; }
 .ct-toolbar button:hover { background: var(--ct-group-bg); }
+.ct-canvas[data-interactive="true"] .ct-node:hover { outline: 1px solid var(--ct-accent); cursor: grab; }
+.ct-canvas[data-interactive="true"] .ct-node.ct-dragging { cursor: grabbing; outline: 2px solid var(--ct-accent); }
+.ct-handle { position: absolute; width: 10px; height: 10px; background: var(--ct-accent); border: 1px solid var(--ct-bg); border-radius: 2px; opacity: 0; transition: opacity 0.1s; pointer-events: auto; z-index: 2; }
+.ct-canvas[data-interactive="true"] .ct-node:hover .ct-handle,
+.ct-canvas[data-interactive="true"] .ct-node.ct-dragging .ct-handle { opacity: 1; }
+.ct-handle-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.ct-handle-n  { left: calc(50% - 5px); top: -5px; cursor: ns-resize; }
+.ct-handle-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.ct-handle-e  { right: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.ct-handle-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.ct-handle-s  { left: calc(50% - 5px); bottom: -5px; cursor: ns-resize; }
+.ct-handle-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.ct-handle-w  { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.ct-toolbar button[data-act="reset"] { font-size: 12px; padding: 0 8px; width: auto; }
 `;
