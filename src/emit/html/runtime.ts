@@ -72,8 +72,6 @@ export const HTML_RUNTIME = `
 		return { kind: 'pan' };
 	}
 
-	// Helpers exposed for the next runtime sections
-	window.__ctRuntime = { state: state, nodeMap: nodeMap, edgesByNode: edgesByNode, original: original, view: view, viewport: viewport, canvas: canvas, hitTest: hitTest, interactive: interactive, applyView: applyView, fit: fit, zoomAt: zoomAt };
 
 	// ── Drag (pan + node move) ───────────────────────────────────────────────
 	var DRAG_THRESHOLD = 3;
@@ -189,6 +187,23 @@ export const HTML_RUNTIME = `
 		return                       { x: p.x - off,  y: p.y };
 	}
 	function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, function (c) { return '\\' + c; }); }
+	function resetLayout() {
+		var ids = [];
+		for (var i = 0; i < original.nodes.length; i++) {
+			var orig = original.nodes[i];
+			var cur = nodeMap[orig.id];
+			cur.x = orig.x; cur.y = orig.y; cur.w = orig.w; cur.h = orig.h;
+			var el = canvas.querySelector('.ct-node[data-id="' + cssEscape(orig.id) + '"]');
+			if (el) {
+				el.style.left = (cur.x - bounds.x) + 'px';
+				el.style.top = (cur.y - bounds.y) + 'px';
+				el.style.width = cur.w + 'px';
+				el.style.height = cur.h + 'px';
+			}
+			ids.push(orig.id);
+		}
+		for (var j = 0; j < ids.length; j++) scheduleEdgeUpdate(ids[j]);
+	}
 	function applyResize(start, anchor, dx, dy) {
 		var MIN = 40;
 		var x = start.x, y = start.y, w = start.w, h = start.h;
@@ -245,6 +260,9 @@ export const HTML_RUNTIME = `
 		'<button data-act="zoom-out" title="Zoom out">−</button>' +
 		'<button data-act="fit" title="Fit to view">⤢</button>';
 	document.body.appendChild(toolbar);
+	if (interactive) {
+		toolbar.insertAdjacentHTML('beforeend', '<button data-act="reset" title="Reset layout">Reset</button>');
+	}
 	toolbar.addEventListener('click', function (e) {
 		var btn = e.target;
 		if (btn.tagName !== 'BUTTON') return;
@@ -254,6 +272,7 @@ export const HTML_RUNTIME = `
 		if (act === 'zoom-in') zoomAt(cx, cy, 1.2);
 		else if (act === 'zoom-out') zoomAt(cx, cy, 1 / 1.2);
 		else if (act === 'fit') fit();
+		else if (act === 'reset') resetLayout();
 	});
 
 	window.addEventListener('resize', fit);
