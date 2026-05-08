@@ -2,12 +2,12 @@ import type {
 	AssetRef,
 	CanvasModel,
 	CanvasNode,
-	CanvasSide,
 	FileNode,
 	GroupNode,
 	LinkNode,
 	TextNode,
 } from "../../model/canvas-types";
+import { anchorPoint, bezierPath } from "./edge-geometry";
 
 export interface RenderedHtml {
 	body: string;
@@ -117,8 +117,8 @@ function renderEdges(model: CanvasModel): string {
 		const from = nodeMap.get(edge.from.node);
 		const to = nodeMap.get(edge.to.node);
 		if (!from || !to) continue;
-		const start = anchor(from, edge.from.side, model);
-		const end = anchor(to, edge.to.side, model);
+		const start = anchorPoint(from, edge.from.side, model.bounds);
+		const end = anchorPoint(to, edge.to.side, model.bounds);
 		const path = bezierPath(start, edge.from.side, end, edge.to.side);
 		const stroke = edge.color ? colorHex(edge.color) : "var(--ct-edge)";
 		const markerEnd = edge.toEnd === "arrow" ? `marker-end="url(#${markerId(stroke, arrowsUsed)})"` : "";
@@ -132,48 +132,6 @@ function renderEdges(model: CanvasModel): string {
 	const w = model.bounds.w;
 	const h = model.bounds.h;
 	return `<svg class="ct-edges" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${defs}${paths.join("")}${labels.join("")}</svg>`;
-}
-
-interface Anchor {
-	x: number;
-	y: number;
-}
-
-function anchor(node: CanvasNode, side: CanvasSide, model: CanvasModel): Anchor {
-	const relX = node.x - model.bounds.x;
-	const relY = node.y - model.bounds.y;
-	switch (side) {
-		case "top":
-			return { x: relX + node.w / 2, y: relY };
-		case "right":
-			return { x: relX + node.w, y: relY + node.h / 2 };
-		case "bottom":
-			return { x: relX + node.w / 2, y: relY + node.h };
-		case "left":
-			return { x: relX, y: relY + node.h / 2 };
-	}
-}
-
-function bezierPath(a: Anchor, aSide: CanvasSide, b: Anchor, bSide: CanvasSide): { d: string; midX: number; midY: number } {
-	const offset = Math.max(40, Math.hypot(b.x - a.x, b.y - a.y) * 0.3);
-	const c1 = controlPoint(a, aSide, offset);
-	const c2 = controlPoint(b, bSide, offset);
-	const midX = (a.x + 3 * c1.x + 3 * c2.x + b.x) / 8;
-	const midY = (a.y + 3 * c1.y + 3 * c2.y + b.y) / 8;
-	return { d: `M ${a.x} ${a.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`, midX, midY };
-}
-
-function controlPoint(p: Anchor, side: CanvasSide, offset: number): Anchor {
-	switch (side) {
-		case "top":
-			return { x: p.x, y: p.y - offset };
-		case "right":
-			return { x: p.x + offset, y: p.y };
-		case "bottom":
-			return { x: p.x, y: p.y + offset };
-		case "left":
-			return { x: p.x - offset, y: p.y };
-	}
 }
 
 function markerId(stroke: string, used: Set<string>): string {
