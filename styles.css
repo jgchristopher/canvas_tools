@@ -1,0 +1,22 @@
+.ct-offscreen-render {
+	position: absolute;
+	left: -99999px;
+	top: -99999px;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+}
+
+.ct-batch-list {
+	max-height: 240px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	padding: 8px;
+	border-radius: 6px;
+}
+
+.ct-batch-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}

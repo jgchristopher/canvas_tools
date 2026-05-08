@@ -1,0 +1,11 @@
+{
+	"nodes": [
+		{ "id": "a", "type": "text", "text": "# Heading\n\nFirst node", "x": 0, "y": 0, "width": 200, "height": 100 },
+		{ "id": "b", "type": "text", "text": "**Second** node", "x": 400, "y": 0, "width": 200, "height": 100 },
+		{ "id": "c", "type": "text", "text": "Third node below", "x": 200, "y": 300, "width": 200, "height": 80 }
+	],
+	"edges": [
+		{ "id": "e1", "fromNode": "a", "fromSide": "right", "toNode": "b", "toSide": "left", "label": "to b" },
+		{ "id": "e2", "fromNode": "a", "toNode": "c" }
+	]
+}

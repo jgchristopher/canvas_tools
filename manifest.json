@@ -1,0 +1,9 @@
+{
+	"id": "canvas-tools",
+	"name": "Canvas Tools",
+	"version": "0.1.0",
+	"minAppVersion": "1.6.0",
+	"description": "Tools for working with Obsidian Canvas notes. Export to interactive HTML or convert to Excalidraw.",
+	"author": "John Christopher",
+	"isDesktopOnly": false
+}
