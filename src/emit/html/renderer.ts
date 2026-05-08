@@ -3,9 +3,7 @@ import type {
 	CanvasModel,
 	CanvasNode,
 	FileNode,
-	GroupNode,
 	LinkNode,
-	TextNode,
 } from "../../model/canvas-types";
 import { anchorPoint, bezierPath } from "./edge-geometry";
 
@@ -58,57 +56,54 @@ function weightFor(node: CanvasNode): number {
 }
 
 function renderNode(node: CanvasNode, model: CanvasModel, opts: RenderOptions, used: Set<string>): string {
-	const left = node.x - model.bounds.x;
-	const top = node.y - model.bounds.y;
-	const colorClass = node.color ? colorClassFor(node.color) : "";
-	const baseStyle = `left:${left}px;top:${top}px;width:${node.w}px;height:${node.h}px;`;
+	const inner = renderNodeInner(node, model, opts, used);
+	const handles = opts.interactive && node.kind !== "group" ? renderHandles() : "";
+	return wrapNode(node, model, inner + handles);
+}
+
+function renderNodeInner(node: CanvasNode, model: CanvasModel, opts: RenderOptions, used: Set<string>): string {
 	switch (node.kind) {
 		case "text":
-			return renderTextNode(node, baseStyle, colorClass);
+			return node.html;
 		case "file":
-			return renderFileNode(node, model, opts, used, baseStyle, colorClass);
+			return renderFileInner(node, model, opts, used);
 		case "link":
-			return renderLinkNode(node, model, opts, used, baseStyle, colorClass);
+			return renderLinkInner(node, model, opts, used);
 		case "group":
-			return renderGroupNode(node, baseStyle, colorClass);
+			return node.label ? `<div class="ct-group-label">${escapeHtml(node.label)}</div>` : "";
 	}
 }
 
-function renderTextNode(node: TextNode, style: string, colorClass: string): string {
-	return `<div class="ct-node ct-node-text ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">${node.html}</div>`;
+function wrapNode(node: CanvasNode, model: CanvasModel, inner: string): string {
+	const left = node.x - model.bounds.x;
+	const top = node.y - model.bounds.y;
+	const colorClass = node.color ? colorClassFor(node.color) : "";
+	const style = `left:${left}px;top:${top}px;width:${node.w}px;height:${node.h}px;`;
+	let kindClass: string;
+	if (node.kind === "file") {
+		kindClass = `ct-node-file${node.imageAssetId ? " ct-image" : ""}${node.missing ? " ct-missing" : ""}`;
+	} else {
+		kindClass = `ct-node-${node.kind}`;
+	}
+	return `<div class="ct-node ${kindClass} ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">${inner}</div>`;
 }
 
-function renderFileNode(
-	node: FileNode,
-	model: CanvasModel,
-	opts: RenderOptions,
-	used: Set<string>,
-	style: string,
-	colorClass: string,
-): string {
+function renderFileInner(node: FileNode, model: CanvasModel, opts: RenderOptions, used: Set<string>): string {
 	if (node.missing) {
-		return `<div class="ct-node ct-node-file ct-missing ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">Missing: ${escapeHtml(node.filePath)}</div>`;
+		return `Missing: ${escapeHtml(node.filePath)}`;
 	}
 	if (node.imageAssetId) {
 		const asset = model.assets.find((a) => a.id === node.imageAssetId);
 		if (asset) {
 			used.add(asset.id);
 			const href = opts.imageHref(asset);
-			return `<div class="ct-node ct-node-file ct-image ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}"><img src="${escapeAttr(href)}" alt="${escapeAttr(node.filePath)}"></div>`;
+			return `<img src="${escapeAttr(href)}" alt="${escapeAttr(node.filePath)}">`;
 		}
 	}
-	const html = node.html ?? `<em>${escapeHtml(node.filePath)}</em>`;
-	return `<div class="ct-node ct-node-file ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">${html}</div>`;
+	return node.html ?? `<em>${escapeHtml(node.filePath)}</em>`;
 }
 
-function renderLinkNode(
-	node: LinkNode,
-	model: CanvasModel,
-	opts: RenderOptions,
-	used: Set<string>,
-	style: string,
-	colorClass: string,
-): string {
+function renderLinkInner(node: LinkNode, model: CanvasModel, opts: RenderOptions, used: Set<string>): string {
 	const host = hostnameOf(node.url);
 	let imageTag = "";
 	if (node.preview?.imageAssetId) {
@@ -120,12 +115,20 @@ function renderLinkNode(
 	}
 	const title = node.preview?.title ?? node.url;
 	const desc = node.preview?.description ?? "";
-	return `<div class="ct-node ct-node-link ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}"><a class="ct-link-card" href="${escapeAttr(node.url)}" target="_blank" rel="noopener noreferrer">${imageTag}<div class="ct-link-body"><div class="ct-link-title">${escapeHtml(title)}</div><div class="ct-link-host">${escapeHtml(host)}</div>${desc ? `<div class="ct-link-desc">${escapeHtml(desc)}</div>` : ""}</div></a></div>`;
+	return `<a class="ct-link-card" href="${escapeAttr(node.url)}" target="_blank" rel="noopener noreferrer">${imageTag}<div class="ct-link-body"><div class="ct-link-title">${escapeHtml(title)}</div><div class="ct-link-host">${escapeHtml(host)}</div>${desc ? `<div class="ct-link-desc">${escapeHtml(desc)}</div>` : ""}</div></a>`;
 }
 
-function renderGroupNode(node: GroupNode, style: string, colorClass: string): string {
-	const label = node.label ? `<div class="ct-group-label">${escapeHtml(node.label)}</div>` : "";
-	return `<div class="ct-node ct-node-group ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">${label}</div>`;
+function renderHandles(): string {
+	return [
+		'<div class="ct-handle ct-handle-nw" data-resize="nw"></div>',
+		'<div class="ct-handle ct-handle-n" data-resize="n"></div>',
+		'<div class="ct-handle ct-handle-ne" data-resize="ne"></div>',
+		'<div class="ct-handle ct-handle-e" data-resize="e"></div>',
+		'<div class="ct-handle ct-handle-se" data-resize="se"></div>',
+		'<div class="ct-handle ct-handle-s" data-resize="s"></div>',
+		'<div class="ct-handle ct-handle-sw" data-resize="sw"></div>',
+		'<div class="ct-handle ct-handle-w" data-resize="w"></div>',
+	].join("");
 }
 
 function renderEdges(model: CanvasModel, interactive: boolean): string {
