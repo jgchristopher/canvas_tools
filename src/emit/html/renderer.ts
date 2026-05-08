@@ -16,6 +16,7 @@ export interface RenderedHtml {
 
 export interface RenderOptions {
 	imageHref: (asset: AssetRef) => string;
+	interactive: boolean;
 }
 
 export function renderModelToHtml(model: CanvasModel, opts: RenderOptions): RenderedHtml {
@@ -24,11 +25,30 @@ export function renderModelToHtml(model: CanvasModel, opts: RenderOptions): Rend
 	const nodeHtml = sortedNodes
 		.map((node) => renderNode(node, model, opts, used))
 		.join("");
-	const edgeSvg = renderEdges(model);
+	const edgeSvg = renderEdges(model, opts.interactive);
 	const bounds = model.bounds;
+	const sidecar = opts.interactive ? renderStateSidecar(model) : "";
+	const handlesAttr = opts.interactive ? ' data-interactive="true"' : "";
 	const dataBounds = JSON.stringify(bounds);
-	const body = `<div class="ct-canvas" data-bounds='${escapeAttr(dataBounds)}' style="width:${bounds.w}px;height:${bounds.h}px;">${edgeSvg}${nodeHtml}</div>`;
+	const body = `<div class="ct-canvas"${handlesAttr} data-bounds='${escapeAttr(dataBounds)}' style="width:${bounds.w}px;height:${bounds.h}px;">${edgeSvg}${nodeHtml}${sidecar}</div>`;
 	return { body, assetIds: used };
+}
+
+function renderStateSidecar(model: CanvasModel): string {
+	const state = {
+		nodes: model.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, kind: n.kind })),
+		edges: model.edges.map((e) => ({
+			id: e.id,
+			from: e.from,
+			to: e.to,
+			label: e.label,
+			color: e.color,
+			toEnd: e.toEnd,
+			fromEnd: e.fromEnd,
+		})),
+		bounds: model.bounds,
+	};
+	return `<script type="application/json" id="ct-state">${JSON.stringify(state)}</script>`;
 }
 
 function weightFor(node: CanvasNode): number {
@@ -107,7 +127,7 @@ function renderGroupNode(node: GroupNode, style: string, colorClass: string): st
 	return `<div class="ct-node ct-node-group ${colorClass}" data-id="${escapeAttr(node.id)}" style="${style}">${label}</div>`;
 }
 
-function renderEdges(model: CanvasModel): string {
+function renderEdges(model: CanvasModel, interactive: boolean): string {
 	if (model.edges.length === 0) return "";
 	const nodeMap = new Map(model.nodes.map((n) => [n.id, n] as const));
 	const paths: string[] = [];
@@ -123,9 +143,10 @@ function renderEdges(model: CanvasModel): string {
 		const stroke = edge.color ? colorHex(edge.color) : "var(--ct-edge)";
 		const markerEnd = edge.toEnd === "arrow" ? `marker-end="url(#${markerId(stroke, arrowsUsed)})"` : "";
 		const markerStart = edge.fromEnd === "arrow" ? `marker-start="url(#${markerId(stroke, arrowsUsed)}-rev)"` : "";
-		paths.push(`<path d="${path.d}" stroke="${stroke}" ${markerEnd} ${markerStart}></path>`);
+		const dataId = interactive ? ` data-id="${escapeAttr(edge.id)}"` : "";
+		paths.push(`<path${dataId} d="${path.d}" stroke="${stroke}" ${markerEnd} ${markerStart}></path>`);
 		if (edge.label) {
-			labels.push(`<text class="ct-edge-label" x="${path.midX}" y="${path.midY}" text-anchor="middle" dominant-baseline="central">${escapeHtml(edge.label)}</text>`);
+			labels.push(`<text${dataId} class="ct-edge-label" x="${path.midX}" y="${path.midY}" text-anchor="middle" dominant-baseline="central">${escapeHtml(edge.label)}</text>`);
 		}
 	}
 	const defs = buildArrowMarkers(arrowsUsed);
