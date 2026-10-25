@@ -107,3 +107,8 @@
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
 }
+
+/* Card menu toggle (global setting, mirrored per canvas). */
+.ct-hide-card-menu .canvas-card-menu {
+	display: none;
+}

@@ -1,21 +1,35 @@
-import { FileView, Plugin, TFile } from "obsidian";
+import { FileView, TFile } from "obsidian";
+import type CanvasToolsPlugin from "../main";
 import { getLiveCanvas } from "./canvas-internals";
+import { CardMenuVisibility } from "./card-menu";
+import { CardMenuButton } from "./card-menu-button";
 import { CanvasPathController } from "./controller";
 import { SlidesController } from "./slides-controller";
 
-export function registerLiveCanvas(plugin: Plugin): void {
+export function registerLiveCanvas(plugin: CanvasToolsPlugin): void {
 	const { app } = plugin;
+	const cardMenu = new CardMenuVisibility(plugin.settings.hideCardMenu, async (hidden) => {
+		plugin.settings.hideCardMenu = hidden;
+		await plugin.saveSettings();
+	});
+	plugin.addCommand({
+		id: "toggle-card-menu",
+		name: "Toggle canvas card menu",
+		callback: () => void cardMenu.toggle(),
+	});
 	// Paths and slides controllers are created and detached together per view;
 	// slides drive highlights through the paths controller.
 	interface ViewControllers {
 		paths: CanvasPathController;
 		slides: SlidesController;
+		cardMenu: CardMenuButton;
 		filePath: string | null;
 	}
 	const controllers = new Map<FileView, ViewControllers>();
 	let warned = false;
 
 	const detach = (view: FileView, pair: ViewControllers): void => {
+		plugin.removeChild(pair.cardMenu);
 		plugin.removeChild(pair.slides);
 		plugin.removeChild(pair.paths);
 		controllers.delete(view);
@@ -39,7 +53,8 @@ export function registerLiveCanvas(plugin: Plugin): void {
 			}
 			const paths = plugin.addChild(new CanvasPathController(app, view, canvas));
 			const slides = plugin.addChild(new SlidesController(app, view, canvas, paths));
-			controllers.set(view, { paths, slides, filePath: view.file?.path ?? null });
+			const cardMenuButton = plugin.addChild(new CardMenuButton(canvas, cardMenu));
+			controllers.set(view, { paths, slides, cardMenu: cardMenuButton, filePath: view.file?.path ?? null });
 		}
 		for (const [view, pair] of controllers) {
 			if (!open.has(view)) detach(view, pair);
