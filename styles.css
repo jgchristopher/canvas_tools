@@ -20,3 +20,54 @@
 	gap: 8px;
 	align-items: center;
 }
+
+/* Canvas path highlight: everything off the active path fades. */
+.canvas-edges g.ct-path-edge-off,
+.canvas-path-label-wrapper.ct-path-edge-off {
+	opacity: 0.15;
+}
+
+.canvas-node.ct-path-node-off {
+	opacity: 0.3;
+}
+
+.canvas-edges g.ct-path-edge-on path.canvas-display-path {
+	stroke: var(--interactive-accent);
+	stroke-width: calc(4px * var(--zoom-multiplier));
+}
+
+.canvas-edges g.ct-path-edge-on polygon.canvas-path-end {
+	fill: var(--interactive-accent);
+}
+
+.canvas-path-label-wrapper.ct-path-edge-on .canvas-path-label {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.canvas-node.ct-path-node-on .canvas-node-container {
+	box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* Edit mode: wider hit targets so a finger can tap an edge. */
+.ct-path-editing .canvas-edges path.canvas-interaction-path {
+	stroke-width: max(32px, calc(32px * var(--zoom-multiplier)));
+	cursor: pointer;
+}
+
+.ct-path-edit-pill {
+	position: absolute;
+	top: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 110;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 6px 6px 14px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	border: 1px solid var(--interactive-accent);
+	border-radius: var(--radius-l);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
+}
