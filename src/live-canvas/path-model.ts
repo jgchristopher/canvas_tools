@@ -65,7 +65,7 @@ export function parsePathSet(raw: string, canvasPath: string): CanvasPathSet | n
 	for (const p of data.paths) {
 		if (!isRecord(p) || typeof p.id !== "string" || typeof p.name !== "string") return null;
 		if (!Array.isArray(p.edgeIds) || !p.edgeIds.every((e) => typeof e === "string")) return null;
-		paths.push({ id: p.id, name: p.name, edgeIds: p.edgeIds as string[] });
+		paths.push({ id: p.id, name: p.name, edgeIds: p.edgeIds });
 	}
 	return { version: 1, canvasPath, paths };
 }
