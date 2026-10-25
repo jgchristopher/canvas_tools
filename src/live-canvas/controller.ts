@@ -145,6 +145,11 @@ export class CanvasPathController extends Component {
 		this.showActive();
 	}
 
+	// The path currently highlighted in this view, if any.
+	get activePathId(): string | null {
+		return this.activeId;
+	}
+
 	listPaths(): CanvasPath[] {
 		return this.currentSet().paths;
 	}

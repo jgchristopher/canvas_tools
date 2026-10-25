@@ -36,8 +36,9 @@ export function nextSlideName(deck: SlideDeck): string {
 	return `Slide ${n}`;
 }
 
-export function addSlide(deck: SlideDeck, id: string, name: string, rect: Rect): SlideDeck {
-	return { ...deck, slides: [...deck.slides, { id, name: name.trim(), rect: { ...rect } }] };
+export function addSlide(deck: SlideDeck, id: string, name: string, rect: Rect, pathId: string | null = null): SlideDeck {
+	const slide = withOptional({ id, name: name.trim(), rect: { ...rect } }, "pathId", pathId ?? undefined);
+	return { ...deck, slides: [...deck.slides, slide] };
 }
 
 export function updateSlideRect(deck: SlideDeck, id: string, rect: Rect): SlideDeck {

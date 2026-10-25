@@ -43,6 +43,12 @@ describe("slide transforms", () => {
 		expect(d.slides[0]).toEqual({ id: "s1", name: "Intro", rect: r(0, 0, 100, 50) });
 	});
 
+	it("adds a slide with the path highlighted at capture time", () => {
+		const d = addSlide(emptyDeck(), "s9", "Lit", r(0, 0, 1, 1), "path-a");
+		expect(d.slides[0]).toEqual({ id: "s9", name: "Lit", rect: r(0, 0, 1, 1), pathId: "path-a" });
+		expect("pathId" in addSlide(emptyDeck(), "s8", "Plain", r(0, 0, 1, 1), null).slides[0]).toBe(false);
+	});
+
 	it("updates a slide's rect", () => {
 		expect(updateSlideRect(three(), "s2", r(1, 2, 3, 4)).slides[1].rect).toEqual(r(1, 2, 3, 4));
 	});

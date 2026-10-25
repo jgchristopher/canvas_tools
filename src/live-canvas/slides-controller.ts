@@ -230,7 +230,9 @@ export class SlidesController extends Component {
 
 	private addFromView(): void {
 		const rect = this.capturedRect();
-		if (rect) this.mutate((d) => addSlide(d, shortId("slide"), nextSlideName(d), rect));
+		// Capture the framing and whatever path is highlighted right now.
+		const pathId = this.paths.activePathId;
+		if (rect) this.mutate((d) => addSlide(d, shortId("slide"), nextSlideName(d), rect, pathId));
 	}
 
 	// A hidden or collapsed canvas reports a zero-size view. Writing that would
