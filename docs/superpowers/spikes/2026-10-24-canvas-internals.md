@@ -50,3 +50,23 @@ Probed Obsidian 1.15.0 (desktop, macOS) through the Obsidian CLI's `eval` agains
 ## Gate
 
 Items 1, 2, 3, and 5 are all possible on desktop. Proceed.
+
+## Verification (2026-10-24, build 9dd17a5)
+
+Desktop (macOS, Obsidian 1.15.0, jcOS vault), all checks run by John:
+
+| Check | Result |
+|---|---|
+| Paths button on already-open and newly opened canvases | Pass (confirmed via CLI on both open canvases) |
+| New path → edit mode, tap to toggle, Done and Esc exit | Pass |
+| Empty and duplicate names rejected with a notice | Pass |
+| Switch between two paths with a shared edge, then Show all edges | Pass |
+| Pan, zoom, add edge, delete on-path edge, undo while highlighted | Pass |
+| Rename canvas with a path active: highlight stays, paths survive reopen | Pass |
+| Rename the folder holding the canvas: paths still load | Pass |
+| Esc inside the Rename modal during edit mode | Pass |
+| Close canvas mid-edit-mode: no pill or leftovers | Pass |
+| `.canvas` file unchanged after the session (shasum before/after) | Pass (`4736678b…` both times) |
+| No errors in `dev:errors` after plugin reload | Pass |
+
+Pending: the phone checks (tap to toggle, menu, pill) and the two-machine sync check.
