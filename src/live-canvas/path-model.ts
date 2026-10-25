@@ -4,10 +4,19 @@ export interface CanvasPath {
 	edgeIds: string[];
 }
 
+// Paths live in the .canvas file under this top-level key. Obsidian's canvas
+// save spreads unknown top-level keys back in, so the key survives its saves.
+export const PATHS_KEY = "canvasToolsPaths";
+export const CORRUPT_KEY = "canvasToolsPathsCorrupt";
+
 export interface CanvasPathSet {
 	version: 1;
-	canvasPath: string;
 	paths: CanvasPath[];
+}
+
+export interface ReadResult {
+	set: CanvasPathSet;
+	corrupt: boolean;
 }
 
 export type NameCheck = { ok: true; name: string } | { ok: false; reason: "empty" | "duplicate" };
@@ -18,8 +27,8 @@ export interface EdgeEnds {
 	toNode: string;
 }
 
-export function emptyPathSet(canvasPath: string): CanvasPathSet {
-	return { version: 1, canvasPath, paths: [] };
+export function emptyPathSet(): CanvasPathSet {
+	return { version: 1, paths: [] };
 }
 
 export function checkPathName(set: CanvasPathSet, name: string, exceptId?: string): NameCheck {
@@ -53,21 +62,30 @@ export function findPath(set: CanvasPathSet, id: string): CanvasPath | undefined
 	return set.paths.find((p) => p.id === id);
 }
 
-export function parsePathSet(raw: string, canvasPath: string): CanvasPathSet | null {
-	let data: unknown;
-	try {
-		data = JSON.parse(raw);
-	} catch {
-		return null;
-	}
-	if (!isRecord(data) || data.version !== 1 || !Array.isArray(data.paths)) return null;
+export function parsePathSet(value: unknown): CanvasPathSet | null {
+	if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.paths)) return null;
 	const paths: CanvasPath[] = [];
-	for (const p of data.paths) {
+	for (const p of value.paths) {
 		if (!isRecord(p) || typeof p.id !== "string" || typeof p.name !== "string") return null;
 		if (!Array.isArray(p.edgeIds) || !p.edgeIds.every((e) => typeof e === "string")) return null;
 		paths.push({ id: p.id, name: p.name, edgeIds: p.edgeIds });
 	}
-	return { version: 1, canvasPath, paths };
+	return { version: 1, paths };
+}
+
+export function readPathSet(canvasData: unknown): ReadResult {
+	const value = isRecord(canvasData) ? canvasData[PATHS_KEY] : undefined;
+	if (value === undefined) return { set: emptyPathSet(), corrupt: false };
+	const set = parsePathSet(value);
+	return set ? { set, corrupt: false } : { set: emptyPathSet(), corrupt: true };
+}
+
+// The keys to assign onto canvas data. Never includes nodes, edges, or any
+// other key. A corrupt value is moved aside rather than overwritten.
+export function pathSetPatch(canvasData: unknown, set: CanvasPathSet): Record<string, unknown> {
+	const patch: Record<string, unknown> = { [PATHS_KEY]: set };
+	if (readPathSet(canvasData).corrupt) patch[CORRUPT_KEY] = (canvasData as Record<string, unknown>)[PATHS_KEY];
+	return patch;
 }
 
 export function nodesOnPath(edges: Iterable<EdgeEnds>, edgeIds: ReadonlySet<string>): Set<string> {

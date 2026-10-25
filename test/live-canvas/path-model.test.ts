@@ -3,14 +3,18 @@ import {
 	addPath,
 	checkPathName,
 	deletePath,
+	CORRUPT_KEY,
 	emptyPathSet,
 	nodesOnPath,
 	parsePathSet,
+	PATHS_KEY,
+	pathSetPatch,
+	readPathSet,
 	renamePath,
 	toggleEdge,
 } from "../../src/live-canvas/path-model";
 
-const base = () => addPath(addPath(emptyPathSet("Maps/flow.canvas"), "p1", "Route A"), "p2", "Route B");
+const base = () => addPath(addPath(emptyPathSet(), "p1", "Route A"), "p2", "Route B");
 
 describe("checkPathName", () => {
 	it("trims and accepts a new name", () => {
@@ -61,20 +65,46 @@ describe("rename and delete", () => {
 });
 
 describe("parsePathSet", () => {
-	it("round-trips a valid set", () => {
+	it("round-trips a valid set through JSON", () => {
 		const s = toggleEdge(base(), "p1", "e1");
-		expect(parsePathSet(JSON.stringify(s), "Maps/flow.canvas")).toEqual(s);
+		expect(parsePathSet(JSON.parse(JSON.stringify(s)))).toEqual(s);
 	});
 
-	it("uses the given canvas path over the stored one", () => {
-		const s = { ...base(), canvasPath: "old.canvas" };
-		expect(parsePathSet(JSON.stringify(s), "new.canvas")?.canvasPath).toBe("new.canvas");
+	it("returns null for the wrong shape", () => {
+		expect(parsePathSet("nope")).toBeNull();
+		expect(parsePathSet({ version: 1, paths: [{ id: 1 }] })).toBeNull();
+		expect(parsePathSet({ version: 2, paths: [] })).toBeNull();
+	});
+});
+
+describe("readPathSet", () => {
+	it("treats a missing key as no paths, not corrupt", () => {
+		expect(readPathSet({ nodes: [], edges: [] })).toEqual({ set: emptyPathSet(), corrupt: false });
 	});
 
-	it("returns null for invalid JSON or the wrong shape", () => {
-		expect(parsePathSet("{not json", "a.canvas")).toBeNull();
-		expect(parsePathSet(JSON.stringify({ paths: [{ id: 1 }] }), "a.canvas")).toBeNull();
-		expect(parsePathSet(JSON.stringify({ version: 2, paths: [] }), "a.canvas")).toBeNull();
+	it("reads a valid set from canvas data", () => {
+		const s = toggleEdge(base(), "p1", "e1");
+		expect(readPathSet({ nodes: [], [PATHS_KEY]: s })).toEqual({ set: s, corrupt: false });
+	});
+
+	it("flags a corrupt value and returns an empty set", () => {
+		expect(readPathSet({ [PATHS_KEY]: { version: 1, paths: "x" } })).toEqual({ set: emptyPathSet(), corrupt: true });
+	});
+
+	it("treats non-object canvas data as no paths", () => {
+		expect(readPathSet(undefined)).toEqual({ set: emptyPathSet(), corrupt: false });
+	});
+});
+
+describe("pathSetPatch", () => {
+	it("touches only the plugin's key", () => {
+		const data = { nodes: [{ id: "a" }], edges: [], other: 1 };
+		expect(pathSetPatch(data, base())).toEqual({ [PATHS_KEY]: base() });
+	});
+
+	it("moves a corrupt value aside instead of destroying it", () => {
+		const bad = { version: 1, paths: "x" };
+		expect(pathSetPatch({ [PATHS_KEY]: bad }, base())).toEqual({ [PATHS_KEY]: base(), [CORRUPT_KEY]: bad });
 	});
 });
 

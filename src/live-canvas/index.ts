@@ -1,11 +1,9 @@
 import { FileView, Plugin, TFile } from "obsidian";
 import { getLiveCanvas } from "./canvas-internals";
 import { CanvasPathController } from "./controller";
-import { PathStore } from "./path-store";
 
 export function registerLiveCanvas(plugin: Plugin): void {
 	const { app } = plugin;
-	const store = new PathStore(app.vault.adapter, `${plugin.manifest.dir}/paths`);
 	const controllers = new Map<FileView, CanvasPathController>();
 	let warned = false;
 
@@ -30,7 +28,7 @@ export function registerLiveCanvas(plugin: Plugin): void {
 				warned = true;
 				continue;
 			}
-			controllers.set(view, plugin.addChild(new CanvasPathController(app, view, canvas, store)));
+			controllers.set(view, plugin.addChild(new CanvasPathController(app, view, canvas)));
 		}
 		for (const [view, controller] of controllers) {
 			if (!open.has(view)) detach(view, controller);
@@ -43,21 +41,15 @@ export function registerLiveCanvas(plugin: Plugin): void {
 		plugin.registerEvent(app.workspace.on("file-open", sync));
 	});
 
+	// Paths travel inside the canvas file, so a rename needs no data move.
+	// Retarget open controllers so sync() keeps them (and the active
+	// highlight) instead of rebuilding them for the "new" file.
 	plugin.registerEvent(
 		app.vault.on("rename", (file, oldPath) => {
 			if (!(file instanceof TFile) || file.extension !== "canvas") return;
-			// Retarget open controllers first so sync() keeps them (and the
-			// active highlight) instead of rebuilding them for the "new" file.
 			for (const controller of controllers.values()) {
 				if (controller.filePath === oldPath) controller.filePath = file.path;
 			}
-			store.renameCanvas(oldPath, file.path).catch((err) => console.error("Canvas Tools: failed to move paths", err));
-		}),
-	);
-	plugin.registerEvent(
-		app.vault.on("delete", (file) => {
-			if (!(file instanceof TFile) || file.extension !== "canvas") return;
-			store.deleteCanvas(file.path).catch((err) => console.error("Canvas Tools: failed to delete paths", err));
 		}),
 	);
 }

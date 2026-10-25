@@ -19,6 +19,9 @@ export interface LiveCanvas {
 	edges(): LiveEdge[];
 	nodes(): LiveNode[];
 	edgeFromTarget(target: EventTarget | null): LiveEdge | null;
+	readData(): unknown; // canvas.data; a new object after every save, undo, and reload
+	writeData(patch: Record<string, unknown>): void;
+	isReadonly(): boolean;
 }
 
 export const CONTROL_GROUP_CLASS = "canvas-control-group mod-raised";
@@ -44,6 +47,9 @@ interface RawCanvas {
 	wrapperEl?: unknown;
 	canvasEl?: unknown;
 	canvasControlsEl?: unknown;
+	data?: unknown;
+	readonly?: unknown;
+	requestSave?: unknown;
 }
 
 export function getLiveCanvas(view: unknown): LiveCanvas | null {
@@ -53,6 +59,7 @@ export function getLiveCanvas(view: unknown): LiveCanvas | null {
 	const raw = canvas as RawCanvas;
 	if (!(raw.edges instanceof Map) || !(raw.nodes instanceof Map)) return null;
 	if (!isEl(raw.wrapperEl) || !isEl(raw.canvasEl)) return null;
+	if (!isObject(raw.data) || typeof raw.requestSave !== "function") return null;
 
 	const edgeMap = raw.edges as Map<string, RawEdge>;
 	const nodeMap = raw.nodes as Map<string, RawNode>;
@@ -82,6 +89,18 @@ export function getLiveCanvas(view: unknown): LiveCanvas | null {
 			if (!target) return null;
 			return edges().find((e) => e.els.some((el) => el.contains(target as Node))) ?? null;
 		},
+		readData: () => raw.data,
+		writeData: (patch) => {
+			if (!isObject(raw.data)) return;
+			Object.assign(raw.data, patch);
+			// requestSave(true) refreshes canvas.data from getData() (which spreads
+			// unknown top-level keys back in), pushes an undo snapshot, and runs
+			// the view's debounced save. The snapshot keeps undo consistent: undo
+			// restores whole-canvas snapshots, so a write without one could be
+			// silently reverted by undoing an earlier, unrelated edit.
+			(raw.requestSave as (pushHistory: boolean) => void).call(canvas, true);
+		},
+		isReadonly: () => raw.readonly === true,
 	};
 }
 

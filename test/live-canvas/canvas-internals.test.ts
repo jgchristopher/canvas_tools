@@ -39,6 +39,12 @@ function fakeView() {
 			wrapperEl: fakeEl(),
 			canvasEl: fakeEl(),
 			canvasControlsEl: fakeEl(),
+			data: { nodes: [], edges: [] } as Record<string, unknown>,
+			readonly: false,
+			saves: [] as boolean[],
+			requestSave(pushHistory: boolean) {
+				this.saves.push(pushHistory);
+			},
 		},
 	};
 }
@@ -100,5 +106,33 @@ describe("getLiveCanvas", () => {
 		expect(live.root).toBe(view.canvas.wrapperEl);
 		expect(live.observeEl).toBe(view.canvas.canvasEl);
 		expect(live.controlsEl).toBe(view.canvas.canvasControlsEl);
+	});
+
+	it("returns null when canvas data or save is missing", () => {
+		expect(getLiveCanvas({ canvas: { ...fakeView().canvas, data: undefined } })).toBeNull();
+		expect(getLiveCanvas({ canvas: { ...fakeView().canvas, requestSave: undefined } })).toBeNull();
+	});
+
+	it("reads canvas data live", () => {
+		const view = fakeView();
+		const live = getLiveCanvas(view)!;
+		const next = { nodes: [], edges: [] };
+		view.canvas.data = next;
+		expect(live.readData()).toBe(next);
+	});
+
+	it("writes a patch onto canvas data and saves with an undo step", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.writeData({ canvasToolsPaths: { version: 1, paths: [] } });
+		expect(view.canvas.data).toEqual({ nodes: [], edges: [], canvasToolsPaths: { version: 1, paths: [] } });
+		expect(view.canvas.saves).toEqual([true]);
+	});
+
+	it("reports read-only state live", () => {
+		const view = fakeView();
+		const live = getLiveCanvas(view)!;
+		expect(live.isReadonly()).toBe(false);
+		view.canvas.readonly = true;
+		expect(live.isReadonly()).toBe(true);
 	});
 });
