@@ -113,7 +113,14 @@ function parseRect(value: unknown): Rect | null {
 	const nums = [minX, minY, maxX, maxY];
 	if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;
 	const rect = { minX, minY, maxX, maxY } as Rect;
-	return rect.maxX > rect.minX && rect.maxY > rect.minY ? rect : null;
+	return isValidRect(rect) ? rect : null;
+}
+
+// parseDeck rejects a whole deck containing an invalid rect, so callers check
+// a captured rect before writing it.
+export function isValidRect(rect: Rect): boolean {
+	const nums = [rect.minX, rect.minY, rect.maxX, rect.maxY];
+	return nums.every((n) => Number.isFinite(n)) && rect.maxX > rect.minX && rect.maxY > rect.minY;
 }
 
 function isValidDuration(sec: number): boolean {

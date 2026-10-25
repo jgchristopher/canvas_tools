@@ -1,11 +1,12 @@
 import { App, Component, FileView, Menu, Notice, setIcon } from "obsidian";
-import { confirmDelete, promptPathName } from "../ui/path-name-modal";
+import { confirmDelete, NameErrors, promptName } from "../ui/path-name-modal";
 import { shortId } from "../utils/ids";
 import { CONTROL_BUTTON_CLASS, CONTROL_GROUP_CLASS, LiveCanvas } from "./canvas-internals";
 import { EditMode } from "./edit-mode";
 import { Highlighter } from "./highlighter";
 import {
 	addPath,
+	CanvasPath,
 	CanvasPathSet,
 	checkPathName,
 	deletePath,
@@ -15,6 +16,11 @@ import {
 	renamePath,
 	toggleEdge,
 } from "./path-model";
+
+const PATH_NAME_ERRORS: NameErrors = {
+	empty: "Path name can't be empty.",
+	duplicate: "A path with that name already exists.",
+};
 
 // How often to check whether canvas data was replaced (undo, redo, or a
 // reload from disk when sync brings in a newer version).
@@ -90,14 +96,14 @@ export class CanvasPathController extends Component {
 			item
 				.setTitle("Show all edges")
 				.setChecked(!active)
-				.onClick(() => this.setActive(null)),
+				.onClick(() => this.setActivePath(null)),
 		);
 		for (const path of set.paths) {
 			menu.addItem((item) =>
 				item
 					.setTitle(path.name)
 					.setChecked(path.id === active?.id)
-					.onClick(() => this.setActive(path.id === active?.id ? null : path.id)),
+					.onClick(() => this.setActivePath(path.id === active?.id ? null : path.id)),
 			);
 		}
 		menu.addSeparator();
@@ -132,10 +138,15 @@ export class CanvasPathController extends Component {
 		menu.showAtMouseEvent(evt);
 	}
 
-	private setActive(id: string | null): void {
+	// Public so the slides controller can drive the single per-view highlight.
+	setActivePath(id: string | null): void {
 		this.stopEditing();
 		this.activeId = id;
 		this.showActive();
+	}
+
+	listPaths(): CanvasPath[] {
+		return this.currentSet().paths;
 	}
 
 	private showActive(): void {
@@ -164,27 +175,31 @@ export class CanvasPathController extends Component {
 		);
 	}
 
-	private stopEditing(): void {
+	stopEditing(): void {
 		if (!this.editMode) return;
 		this.removeChild(this.editMode);
 		this.editMode = null;
 	}
 
 	private async newPath(): Promise<void> {
-		const name = await promptPathName(this.app, "New path", "", (n) => checkPathName(this.currentSet(), n));
+		const name = await promptName(this.app, "New path", "", (n) => checkPathName(this.currentSet(), n), PATH_NAME_ERRORS);
 		if (!name) return;
 		const id = shortId("path");
 		this.mutate((s) => addPath(s, id, name));
 		if (!findPath(this.currentSet(), id)) return;
-		this.setActive(id);
+		this.setActivePath(id);
 		this.startEditing();
 	}
 
 	private async renameActive(): Promise<void> {
 		const path = this.activeId ? findPath(this.currentSet(), this.activeId) : undefined;
 		if (!path) return;
-		const name = await promptPathName(this.app, "Rename path", path.name, (n) =>
-			checkPathName(this.currentSet(), n, path.id),
+		const name = await promptName(
+			this.app,
+			"Rename path",
+			path.name,
+			(n) => checkPathName(this.currentSet(), n, path.id),
+			PATH_NAME_ERRORS,
 		);
 		if (!name) return;
 		const wasEditing = !!this.editMode;
@@ -194,9 +209,9 @@ export class CanvasPathController extends Component {
 
 	private async deleteActive(): Promise<void> {
 		const path = this.activeId ? findPath(this.currentSet(), this.activeId) : undefined;
-		if (!path || !(await confirmDelete(this.app, path.name))) return;
+		if (!path || !(await confirmDelete(this.app, `Delete path "${path.name}"?`))) return;
 		this.mutate((s) => deletePath(s, path.id));
-		this.setActive(null);
+		this.setActivePath(null);
 	}
 
 	// Writes go through the open canvas's own save, so Obsidian's pending

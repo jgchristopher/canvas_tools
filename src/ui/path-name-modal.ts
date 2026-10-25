@@ -1,25 +1,28 @@
 import { App, Modal, Notice, Setting } from "obsidian";
 import type { NameCheck } from "../live-canvas/path-model";
 
-const NAME_ERRORS: Record<"empty" | "duplicate", string> = {
-	empty: "Path name can't be empty.",
-	duplicate: "A path with that name already exists.",
-};
+// `duplicate` is only needed when `validate` can reject duplicates.
+export interface NameErrors {
+	empty: string;
+	duplicate?: string;
+}
 
-export function promptPathName(
+export function promptName(
 	app: App,
 	title: string,
 	initial: string,
 	validate: (name: string) => NameCheck,
+	errors: NameErrors,
 ): Promise<string | null> {
-	return new Promise((resolve) => new PathNameModal(app, title, initial, validate, resolve).open());
+	return new Promise((resolve) => new NameModal(app, title, initial, validate, errors, resolve).open());
 }
 
-export function confirmDelete(app: App, pathName: string): Promise<boolean> {
-	return new Promise((resolve) => new ConfirmDeleteModal(app, pathName, resolve).open());
+// `title` is the full question, e.g. 'Delete path "Route A"?'.
+export function confirmDelete(app: App, title: string): Promise<boolean> {
+	return new Promise((resolve) => new ConfirmDeleteModal(app, title, resolve).open());
 }
 
-class PathNameModal extends Modal {
+class NameModal extends Modal {
 	private value: string;
 	private result: string | null = null;
 
@@ -28,6 +31,7 @@ class PathNameModal extends Modal {
 		title: string,
 		initial: string,
 		private readonly validate: (name: string) => NameCheck,
+		private readonly errors: NameErrors,
 		private readonly resolve: (name: string | null) => void,
 	) {
 		super(app);
@@ -57,7 +61,7 @@ class PathNameModal extends Modal {
 	private submit(): void {
 		const check = this.validate(this.value);
 		if (!check.ok) {
-			new Notice(NAME_ERRORS[check.reason]);
+			new Notice(this.errors[check.reason] ?? "Name not allowed.");
 			return;
 		}
 		this.result = check.name;
@@ -70,11 +74,11 @@ class ConfirmDeleteModal extends Modal {
 
 	constructor(
 		app: App,
-		pathName: string,
+		title: string,
 		private readonly resolve: (confirmed: boolean) => void,
 	) {
 		super(app);
-		this.setTitle(`Delete path "${pathName}"?`);
+		this.setTitle(title);
 	}
 
 	onOpen(): void {

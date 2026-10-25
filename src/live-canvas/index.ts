@@ -1,14 +1,23 @@
 import { FileView, Plugin, TFile } from "obsidian";
 import { getLiveCanvas } from "./canvas-internals";
 import { CanvasPathController } from "./controller";
+import { SlidesController } from "./slides-controller";
 
 export function registerLiveCanvas(plugin: Plugin): void {
 	const { app } = plugin;
-	const controllers = new Map<FileView, CanvasPathController>();
+	// Paths and slides controllers are created and detached together per view;
+	// slides drive highlights through the paths controller.
+	interface ViewControllers {
+		paths: CanvasPathController;
+		slides: SlidesController;
+		filePath: string | null;
+	}
+	const controllers = new Map<FileView, ViewControllers>();
 	let warned = false;
 
-	const detach = (view: FileView, controller: CanvasPathController): void => {
-		plugin.removeChild(controller);
+	const detach = (view: FileView, pair: ViewControllers): void => {
+		plugin.removeChild(pair.slides);
+		plugin.removeChild(pair.paths);
 		controllers.delete(view);
 	};
 
@@ -28,10 +37,12 @@ export function registerLiveCanvas(plugin: Plugin): void {
 				warned = true;
 				continue;
 			}
-			controllers.set(view, plugin.addChild(new CanvasPathController(app, view, canvas)));
+			const paths = plugin.addChild(new CanvasPathController(app, view, canvas));
+			const slides = plugin.addChild(new SlidesController(app, view, canvas, paths));
+			controllers.set(view, { paths, slides, filePath: view.file?.path ?? null });
 		}
-		for (const [view, controller] of controllers) {
-			if (!open.has(view)) detach(view, controller);
+		for (const [view, pair] of controllers) {
+			if (!open.has(view)) detach(view, pair);
 		}
 	};
 
@@ -47,8 +58,11 @@ export function registerLiveCanvas(plugin: Plugin): void {
 	plugin.registerEvent(
 		app.vault.on("rename", (file, oldPath) => {
 			if (!(file instanceof TFile) || file.extension !== "canvas") return;
-			for (const controller of controllers.values()) {
-				if (controller.filePath === oldPath) controller.filePath = file.path;
+			for (const pair of controllers.values()) {
+				if (pair.filePath !== oldPath) continue;
+				pair.filePath = file.path;
+				pair.paths.filePath = file.path;
+				pair.slides.filePath = file.path;
 			}
 		}),
 	);

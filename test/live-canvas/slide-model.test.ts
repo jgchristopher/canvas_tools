@@ -3,6 +3,7 @@ import {
 	addSlide,
 	deckPatch,
 	DEFAULT_DURATION_SEC,
+	isValidRect,
 	deleteSlide,
 	emptyDeck,
 	moveSlide,
@@ -135,5 +136,17 @@ describe("readDeck and deckPatch", () => {
 	it("moves a corrupt value aside", () => {
 		const bad = { version: 1, slides: "x" };
 		expect(deckPatch({ [SLIDES_KEY]: bad }, three())).toEqual({ [SLIDES_KEY]: three(), [SLIDES_CORRUPT_KEY]: bad });
+	});
+});
+
+describe("isValidRect", () => {
+	it("accepts a positive-area finite rect", () => {
+		expect(isValidRect(r(0, 0, 1, 1))).toBe(true);
+	});
+
+	it("rejects zero-area, inverted, and non-finite rects", () => {
+		expect(isValidRect(r(0, 0, 0, 0))).toBe(false);
+		expect(isValidRect(r(5, 0, 1, 1))).toBe(false);
+		expect(isValidRect(r(0, 0, Number.NaN, 1))).toBe(false);
 	});
 });
