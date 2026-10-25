@@ -1,3 +1,5 @@
+import { isRecord, keyedPatch, readKeyed } from "./canvas-data";
+
 export interface CanvasPath {
 	id: string;
 	name: string;
@@ -74,18 +76,14 @@ export function parsePathSet(value: unknown): CanvasPathSet | null {
 }
 
 export function readPathSet(canvasData: unknown): ReadResult {
-	const value = isRecord(canvasData) ? canvasData[PATHS_KEY] : undefined;
-	if (value === undefined) return { set: emptyPathSet(), corrupt: false };
-	const set = parsePathSet(value);
-	return set ? { set, corrupt: false } : { set: emptyPathSet(), corrupt: true };
+	const { value, corrupt } = readKeyed(canvasData, PATHS_KEY, parsePathSet, emptyPathSet);
+	return { set: value, corrupt };
 }
 
 // The keys to assign onto canvas data. Never includes nodes, edges, or any
 // other key. A corrupt value is moved aside rather than overwritten.
 export function pathSetPatch(canvasData: unknown, set: CanvasPathSet): Record<string, unknown> {
-	const patch: Record<string, unknown> = { [PATHS_KEY]: set };
-	if (readPathSet(canvasData).corrupt) patch[CORRUPT_KEY] = (canvasData as Record<string, unknown>)[PATHS_KEY];
-	return patch;
+	return keyedPatch(canvasData, PATHS_KEY, CORRUPT_KEY, parsePathSet, set);
 }
 
 export function nodesOnPath(edges: Iterable<EdgeEnds>, edgeIds: ReadonlySet<string>): Set<string> {
@@ -101,8 +99,4 @@ export function nodesOnPath(edges: Iterable<EdgeEnds>, edgeIds: ReadonlySet<stri
 function mapPath(set: CanvasPathSet, id: string, fn: (p: CanvasPath) => CanvasPath): CanvasPathSet {
 	if (!set.paths.some((p) => p.id === id)) return set;
 	return { ...set, paths: set.paths.map((p) => (p.id === id ? fn(p) : p)) };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

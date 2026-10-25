@@ -131,6 +131,7 @@ export class PresentationSession {
 }
 ```
 
+- `show(i)` and `refit()` skip `setViewport` when `canvas.getScreenSize()` is 0 in either dimension (hidden pane), because `fitRect` has no meaningful fit there.
 - `show(i)` sets the viewport to `fitRect(slide.rect, canvas.getScreenSize(), ZOOM_LIMITS)` with animation. It sets the path to `slide.pathId` if `paths.hasPath(id)` is true, and to `null` otherwise.
 - **Next on the last slide.**
   - When auto-play is running, it wraps to the first slide.

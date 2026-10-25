@@ -45,6 +45,25 @@ function fakeView() {
 			requestSave(pushHistory: boolean) {
 				this.saves.push(pushHistory);
 			},
+			canvasRect: { width: 1600, height: 900 },
+			x: 10,
+			y: 20,
+			zoom: 0,
+			tx: 10,
+			ty: 20,
+			tZoom: 0,
+			zoomCenter: { x: 1, y: 1 } as { x: number; y: number } | null,
+			marks: 0,
+			deselects: 0,
+			getViewportBBox() {
+				return { minX: -790, minY: -430, maxX: 810, maxY: 470 };
+			},
+			markViewportChanged() {
+				this.marks++;
+			},
+			deselectAll() {
+				this.deselects++;
+			},
 		},
 	};
 }
@@ -134,5 +153,43 @@ describe("getLiveCanvas", () => {
 		expect(live.isReadonly()).toBe(false);
 		view.canvas.readonly = true;
 		expect(live.isReadonly()).toBe(true);
+	});
+
+	it("returns null when viewport internals are missing", () => {
+		for (const key of ["getViewportBBox", "markViewportChanged", "deselectAll", "canvasRect"]) {
+			expect(getLiveCanvas({ canvas: { ...fakeView().canvas, [key]: undefined } })).toBeNull();
+		}
+	});
+
+	it("reads the visible rect and screen size", () => {
+		const live = getLiveCanvas(fakeView())!;
+		expect(live.getViewportRect()).toEqual({ minX: -790, minY: -430, maxX: 810, maxY: 470 });
+		expect(live.getScreenSize()).toEqual({ width: 1600, height: 900 });
+	});
+
+	it("animates to a viewport by setting only the target", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.setViewport({ x: 100, y: 200, zoom: 0.5 }, true);
+		const c = view.canvas;
+		expect([c.tx, c.ty, c.tZoom, c.zoomCenter]).toEqual([100, 200, 0.5, null]);
+		expect([c.x, c.y, c.zoom]).toEqual([10, 20, 0]);
+		expect(c.marks).toBe(1);
+		expect(c.saves).toEqual([]);
+	});
+
+	it("jumps to a viewport by also setting the current position", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.setViewport({ x: 100, y: 200, zoom: 0.5 }, false);
+		const c = view.canvas;
+		expect([c.x, c.y, c.zoom, c.tx, c.ty, c.tZoom]).toEqual([100, 200, 0.5, 100, 200, 0.5]);
+		expect(c.marks).toBe(1);
+		expect(c.saves).toEqual([]);
+	});
+
+	it("clears the selection without saving", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.deselectAll();
+		expect(view.canvas.deselects).toBe(1);
+		expect(view.canvas.saves).toEqual([]);
 	});
 });

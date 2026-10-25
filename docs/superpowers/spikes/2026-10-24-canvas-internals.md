@@ -79,3 +79,26 @@ Paths are now stored in the `.canvas` file under `canvasToolsPaths`.
 - Desktop checks: pass (John).
 - **Mobile: pass (John).** The Paths button, tap-to-toggle, and switching paths all work on the phone. A path created on mobile ("mobile test", 6 edges) synced back to desktop through Obsidian Sync.
 - File diff after the mobile session: only `canvasToolsPaths` and the order of `nodes` changed. No node content changed. The reordering is Obsidian's own z-index sort in `Canvas.getData()`, applied on any save after a node is selected.
+
+## Viewport (2026-10-25, Obsidian 1.15.0)
+
+This was probed through the CLI `eval` on Shepherd Factory Lifecycle and by reading the canvas source in the asar.
+
+- **Current vs target viewport.**
+  - Current: `c.x`, `c.y` (the viewport center in canvas coordinates) and `c.zoom` (log2 of the scale), with `c.scale === 2 ** c.zoom`.
+  - Target: `c.tx`, `c.ty`, `c.tZoom`.
+  - Example: `x 5263.25, y 1119.36, zoom -0.0927, scale 0.9378`.
+- **Screen size.** `c.canvasRect` is a DOMRect for the canvas element (example: `1634 × 931`).
+- **`c.getViewportBBox()`.** Returns `{minX, minY, maxX, maxY}` in canvas coordinates. It always equals the center ± `canvasRect / scale / 2` (checked: width `1742.4 = 1634 / 0.9378`).
+- **Frame loop.** When `viewportChanged` is set, each frame:
+  - clamps `tZoom` to `[cC, cfe] = [-4, 1]`, a scale of 1/16 to 2×
+  - eases `zoom` toward `tZoom` and `x`/`y` toward `tx`/`ty`, with a factor of `1 - 0.984^dt`
+  - when `zoomCenter` is set, zooms around that point instead
+  - writes the CSS transform `translate(w/2, h/2) scale(scale) translate(-x, -y)`
+- **Moving the view.**
+  - To animate to a viewport: set `tx`, `ty`, `tZoom`, set `zoomCenter = null`, then call `markViewportChanged()`, which sets the flag and calls `requestFrame()`.
+  - To jump: also set `x`, `y`, `zoom`. `panTo(x, y)` does this for position only.
+- **Zoom limits.** `ZOOM_LIMITS = { min: -4, max: 1 }`. `zoomToBbox` additionally clamps to `[-4, log2(1) = 0]` and pads by 10%, which is why the slides feature uses its own fit.
+- **No save on viewport change (confirmed live).** A scripted change of `tx`/`ty`/`tZoom` plus `markViewportChanged()` plus `deselectAll()` produced 0 `requestSave` calls. `c.data` stayed the same object, and the `.canvas` file's shasum was unchanged (`76722ae9b541` before and after).
+- **`deselectAll()`.** Clears the selection through `updateSelection`, with no save.
+- **Caveat.** Frames only run while the Obsidian window is visible (`requestAnimationFrame`). With the window hidden, a viewport change is queued and applies the next time the window shows. The live animation itself is checked by hand in Phase 2.
