@@ -23,7 +23,9 @@ export interface LiveCanvas {
 	edgeFromTarget(target: EventTarget | null): LiveEdge | null;
 	isItemTarget(target: EventTarget | null): boolean; // inside a node, edge, or edge label
 	readData(): unknown; // canvas.data; a new object after every save, undo, and reload
-	writeData(patch: Record<string, unknown>): void;
+	// undoable (default true): the write is its own undo step. false: the write
+	// sits outside undo history, so undo/redo never change the patched keys.
+	writeData(patch: Record<string, unknown>, options?: { undoable?: boolean }): void;
 	isReadonly(): boolean;
 	getViewportRect(): Rect;
 	getScreenSize(): Size;
@@ -60,6 +62,7 @@ interface RawCanvas {
 	data?: unknown;
 	readonly?: unknown;
 	requestSave?: unknown;
+	history?: { data?: unknown };
 	canvasRect?: { width?: unknown; height?: unknown };
 	getViewportBBox?: unknown;
 	markViewportChanged?: unknown;
@@ -121,15 +124,22 @@ export function getLiveCanvas(view: unknown): LiveCanvas | null {
 			return edges().some((e) => e.els.some((el) => el.contains(node)));
 		},
 		readData: () => raw.data,
-		writeData: (patch) => {
+		writeData: (patch, options) => {
 			if (!isObject(raw.data)) return;
 			Object.assign(raw.data, patch);
-			// requestSave(true) refreshes canvas.data from getData() (which spreads
-			// unknown top-level keys back in), pushes an undo snapshot, and runs
-			// the view's debounced save. The snapshot keeps undo consistent: undo
-			// restores whole-canvas snapshots, so a write without one could be
-			// silently reverted by undoing an earlier, unrelated edit.
-			(raw.requestSave as (pushHistory: boolean) => void).call(canvas, true);
+			const undoable = options?.undoable ?? true;
+			if (!undoable) {
+				// Undo restores whole-canvas snapshots from history.data. Give every
+				// snapshot the same values so undo/redo leave these keys as written.
+				const snapshots = raw.history?.data;
+				if (Array.isArray(snapshots)) {
+					for (const snapshot of snapshots) if (isObject(snapshot)) Object.assign(snapshot, patch);
+				}
+			}
+			// requestSave refreshes canvas.data from getData() (which spreads
+			// unknown top-level keys back in) and runs the view's debounced save.
+			// With pushHistory=true it also records an undo snapshot.
+			(raw.requestSave as (pushHistory: boolean) => void).call(canvas, undoable);
 		},
 		isReadonly: () => raw.readonly === true,
 		getViewportRect: () => {

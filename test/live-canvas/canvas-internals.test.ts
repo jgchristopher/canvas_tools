@@ -45,6 +45,7 @@ function fakeView() {
 			requestSave(pushHistory: boolean) {
 				this.saves.push(pushHistory);
 			},
+			history: { data: [{ nodes: [], edges: [] }, { nodes: [], edges: [], canvasToolsSlides: "old" }] as Record<string, unknown>[], current: 1 },
 			canvasRect: { width: 1600, height: 900 },
 			x: 10,
 			y: 20,
@@ -202,5 +203,24 @@ describe("getLiveCanvas", () => {
 		expect(live.isItemTarget(edge.labelElement!.wrapperEl)).toBe(true);
 		expect(live.isItemTarget(view.canvas.canvasEl)).toBe(false);
 		expect(live.isItemTarget(null)).toBe(false);
+	});
+
+	it("writes outside undo by patching every history snapshot", () => {
+		const view = fakeView();
+		const patch = { canvasToolsSlides: { version: 1, slides: [] } };
+		getLiveCanvas(view)!.writeData(patch, { undoable: false });
+		expect(view.canvas.saves).toEqual([false]);
+		expect(view.canvas.data.canvasToolsSlides).toEqual(patch.canvasToolsSlides);
+		for (const snapshot of view.canvas.history.data) {
+			expect(snapshot.canvasToolsSlides).toEqual(patch.canvasToolsSlides);
+		}
+	});
+
+	it("keeps undoable writes as undo steps without touching history", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.writeData({ canvasToolsPaths: { version: 1, paths: [] } });
+		expect(view.canvas.saves).toEqual([true]);
+		expect(view.canvas.history.data[1].canvasToolsSlides).toBe("old");
+		expect("canvasToolsPaths" in view.canvas.history.data[0]).toBe(false);
 	});
 });

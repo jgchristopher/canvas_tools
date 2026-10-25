@@ -279,13 +279,14 @@ export class SlidesController extends Component {
 		this.mutate((d) => deleteSlide(d, slide.id));
 	}
 
-	// Same write path as paths: through the open canvas's own save, as an
-	// undo step, touching only the slides key.
+	// Through the open canvas's own save, touching only the slides key, and
+	// outside undo history: slides change only through explicit slide actions,
+	// never as a side effect of Cmd+Z on unrelated canvas edits.
 	private mutate(change: (deck: SlideDeck) => SlideDeck): void {
 		if (this.canvas.isReadonly()) return;
 		try {
 			const data = this.canvas.readData();
-			this.canvas.writeData(deckPatch(data, change(readDeck(data).deck)));
+			this.canvas.writeData(deckPatch(data, change(readDeck(data).deck)), { undoable: false });
 		} catch (err) {
 			console.error("Canvas Tools: failed to save slides", err);
 			new Notice("Couldn't save slides for this canvas.");
