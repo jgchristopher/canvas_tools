@@ -141,11 +141,11 @@ describe("getLiveCanvas", () => {
 		expect(live.readData()).toBe(next);
 	});
 
-	it("writes a patch onto canvas data and saves with an undo step", () => {
+	it("writes a patch onto canvas data and saves without an undo step", () => {
 		const view = fakeView();
 		getLiveCanvas(view)!.writeData({ canvasToolsPaths: { version: 1, paths: [] } });
 		expect(view.canvas.data).toEqual({ nodes: [], edges: [], canvasToolsPaths: { version: 1, paths: [] } });
-		expect(view.canvas.saves).toEqual([true]);
+		expect(view.canvas.saves).toEqual([false]);
 	});
 
 	it("reports read-only state live", () => {
@@ -208,7 +208,7 @@ describe("getLiveCanvas", () => {
 	it("writes outside undo by patching every history snapshot", () => {
 		const view = fakeView();
 		const patch = { canvasToolsSlides: { version: 1, slides: [] } };
-		getLiveCanvas(view)!.writeData(patch, { undoable: false });
+		getLiveCanvas(view)!.writeData(patch);
 		expect(view.canvas.saves).toEqual([false]);
 		expect(view.canvas.data.canvasToolsSlides).toEqual(patch.canvasToolsSlides);
 		for (const snapshot of view.canvas.history.data) {
@@ -216,11 +216,11 @@ describe("getLiveCanvas", () => {
 		}
 	});
 
-	it("keeps undoable writes as undo steps without touching history", () => {
+	it("patches path data into history snapshots too", () => {
 		const view = fakeView();
-		getLiveCanvas(view)!.writeData({ canvasToolsPaths: { version: 1, paths: [] } });
-		expect(view.canvas.saves).toEqual([true]);
-		expect(view.canvas.history.data[1].canvasToolsSlides).toBe("old");
-		expect("canvasToolsPaths" in view.canvas.history.data[0]).toBe(false);
+		const paths = { version: 1, paths: [] };
+		getLiveCanvas(view)!.writeData({ canvasToolsPaths: paths });
+		expect(view.canvas.saves).toEqual([false]);
+		for (const snapshot of view.canvas.history.data) expect(snapshot.canvasToolsPaths).toEqual(paths);
 	});
 });

@@ -215,7 +215,8 @@ export class CanvasPathController extends Component {
 	}
 
 	// Writes go through the open canvas's own save, so Obsidian's pending
-	// saves, undo history, and file reloads all stay consistent.
+	// saves and file reloads stay consistent. They sit outside undo history:
+	// paths change only through explicit path actions, never via Cmd+Z.
 	private mutate(change: (set: CanvasPathSet) => CanvasPathSet): void {
 		if (this.canvas.isReadonly()) return;
 		try {

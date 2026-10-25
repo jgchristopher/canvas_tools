@@ -5,7 +5,7 @@
 
 ## Technical Approach
 
-This phase adds a **Slides** button to the canvas control bar. It works like the Paths button from PR #1. Its menu builds and maintains the deck, and every change is written into the `.canvas` file through `LiveCanvas.writeData`, which counts as an undo step, the same way path changes are.
+This phase adds a **Slides** button to the canvas control bar. It works like the Paths button from PR #1. Its menu builds and maintains the deck, and every change is written into the `.canvas` file through `LiveCanvas.writeData`, the same way path changes are. (Revised 2026-10-25: writes now sit outside undo history, so Cmd+Z never changes slides or paths. See `fix: keep slide settings out of canvas undo history`.)
 
 The menu works in two levels so that everything stays a plain tap action on mobile:
 

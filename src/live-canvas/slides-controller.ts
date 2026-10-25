@@ -286,7 +286,7 @@ export class SlidesController extends Component {
 		if (this.canvas.isReadonly()) return;
 		try {
 			const data = this.canvas.readData();
-			this.canvas.writeData(deckPatch(data, change(readDeck(data).deck)), { undoable: false });
+			this.canvas.writeData(deckPatch(data, change(readDeck(data).deck)));
 		} catch (err) {
 			console.error("Canvas Tools: failed to save slides", err);
 			new Notice("Couldn't save slides for this canvas.");
