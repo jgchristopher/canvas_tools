@@ -46,6 +46,31 @@ export function registerLiveCanvas(plugin: Plugin): void {
 		}
 	};
 
+	const activeSlides = (): SlidesController | null => {
+		const view = app.workspace.getActiveViewOfType(FileView);
+		return (view && controllers.get(view)?.slides) ?? null;
+	};
+	const presentationCommand = (id: string, name: string, enabled: (s: SlidesController) => boolean, run: (s: SlidesController) => void) =>
+		plugin.addCommand({
+			id,
+			name,
+			checkCallback: (checking) => {
+				const slides = activeSlides();
+				if (!slides || !enabled(slides)) return false;
+				if (!checking) run(slides);
+				return true;
+			},
+		});
+	presentationCommand(
+		"start-presentation",
+		"Start presentation",
+		(s) => !s.isPresenting && s.currentDeck().slides.length > 0,
+		(s) => s.startPresentation(false),
+	);
+	presentationCommand("stop-presentation", "Stop presentation", (s) => s.isPresenting, (s) => s.stopPresentation());
+	presentationCommand("next-slide", "Next slide", (s) => s.isPresenting, (s) => s.presentationAct("next"));
+	presentationCommand("previous-slide", "Previous slide", (s) => s.isPresenting, (s) => s.presentationAct("prev"));
+
 	app.workspace.onLayoutReady(() => {
 		sync();
 		plugin.registerEvent(app.workspace.on("layout-change", sync));

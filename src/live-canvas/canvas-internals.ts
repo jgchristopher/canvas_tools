@@ -21,6 +21,7 @@ export interface LiveCanvas {
 	edges(): LiveEdge[];
 	nodes(): LiveNode[];
 	edgeFromTarget(target: EventTarget | null): LiveEdge | null;
+	isItemTarget(target: EventTarget | null): boolean; // inside a node, edge, or edge label
 	readData(): unknown; // canvas.data; a new object after every save, undo, and reload
 	writeData(patch: Record<string, unknown>): void;
 	isReadonly(): boolean;
@@ -110,6 +111,14 @@ export function getLiveCanvas(view: unknown): LiveCanvas | null {
 		edgeFromTarget: (target) => {
 			if (!target) return null;
 			return edges().find((e) => e.els.some((el) => el.contains(target as Node))) ?? null;
+		},
+		isItemTarget: (target) => {
+			if (!target) return false;
+			const node = target as Node;
+			for (const n of nodeMap.values()) {
+				if (isEl(n?.nodeEl) && (n.nodeEl as Element).contains(node)) return true;
+			}
+			return edges().some((e) => e.els.some((el) => el.contains(node)));
 		},
 		readData: () => raw.data,
 		writeData: (patch) => {

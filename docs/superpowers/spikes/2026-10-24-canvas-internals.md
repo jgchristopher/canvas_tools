@@ -102,3 +102,25 @@ This was probed through the CLI `eval` on Shepherd Factory Lifecycle and by read
 - **No save on viewport change (confirmed live).** A scripted change of `tx`/`ty`/`tZoom` plus `markViewportChanged()` plus `deselectAll()` produced 0 `requestSave` calls. `c.data` stayed the same object, and the `.canvas` file's shasum was unchanged (`76722ae9b541` before and after).
 - **`deselectAll()`.** Clears the selection through `updateSelection`, with no save.
 - **Caveat.** Frames only run while the Obsidian window is visible (`requestAnimationFrame`). With the window hidden, a viewport change is queued and applies the next time the window shows. The live animation itself is checked by hand in Phase 2.
+
+## Presentation (2026-10-25, Obsidian 1.15.0)
+
+### Keys
+
+From the asar source:
+
+- **Obsidian's keymap.** `window.addEventListener("keydown", onKeyEvent, true)` is registered at app start, so it runs in the capture phase before any plugin listener. It dispatches through a stack of `Scope`s, and a plugin can `app.keymap.pushScope(scope)` to get first say. `scope.register(null, null, fn)` matches every key, and returning `false` consumes the key.
+- **The canvas's own global keys.** `Canvas.load()` adds `window.addEventListener("keydown", onGlobalKeydown)` in the **bubble** phase. Space starts hold-to-pan by appending `moverEl`.
+- **Approach.** A pushed `Scope` with a catch-all handler runs the presentation action and returns `false`. A window **capture** listener calls `stopPropagation()` on presentation keys, Space, arrows, Delete, and Backspace, so the canvas's bubble listener and element handlers never see them. Arrows, Delete, and Backspace have nothing to act on anyway once the selection is cleared and node clicks are blocked.
+
+### UI to hide (desktop)
+
+These are the children of `canvas.wrapperEl` (`div.canvas-wrapper`): `svg.canvas-background`, `div.canvas-card-menu` (the add-card bar), `div.canvas-controls`, `div.canvas`, and `div.canvas-menu-container` (the selection/edge popover). Presentation mode hides `.canvas-card-menu`, `.canvas-controls`, and `.canvas-menu-container` with CSS scoped under `.ct-presenting`.
+
+### Mobile
+
+Not probed, because no phone is reachable from this session. The same wrapper children are expected. The tap bar sits inside `canvas.wrapperEl` with a safe-area offset. Confirm during the hands-on gate.
+
+### Gate
+
+Presentation keys can be consumed before the canvas sees them, through a keymap Scope plus window-capture `stopPropagation`. Proceed.

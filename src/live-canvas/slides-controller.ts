@@ -21,6 +21,8 @@ import {
 	slideDuration,
 	updateSlideRect,
 } from "./slide-model";
+import type { PresentationAction } from "./presentation-keys";
+import { PresentationView } from "./presentation-view";
 import { fitRect } from "./viewport-fit";
 
 // Slide names need not be unique, so only emptiness is rejected.
@@ -31,8 +33,10 @@ const SLIDE_NAME_ERRORS: NameErrors = { empty: "Slide name can't be empty." };
 // path controller so there is only ever one highlighter per view.
 export class SlidesController extends Component {
 	filePath: string | null;
+	private readonly view: FileView;
 	private groupEl: HTMLElement | null = null;
 	private warnedCorrupt = false;
+	private presentation: PresentationView | null = null;
 
 	constructor(
 		private readonly app: App,
@@ -41,6 +45,7 @@ export class SlidesController extends Component {
 		private readonly paths: CanvasPathController,
 	) {
 		super();
+		this.view = view;
 		this.filePath = view.file?.path ?? null;
 	}
 
@@ -80,6 +85,47 @@ export class SlidesController extends Component {
 		this.paths.setActivePath(known ? (slide.pathId ?? null) : null);
 	}
 
+	get isPresenting(): boolean {
+		return this.presentation !== null;
+	}
+
+	startPresentation(autoplay: boolean): void {
+		if (this.presentation) return;
+		const deck = this.currentDeck();
+		if (deck.slides.length === 0) {
+			new Notice("Add a slide first.");
+			return;
+		}
+		const paths = this.paths;
+		this.presentation = this.addChild(
+			new PresentationView(
+				this.app,
+				this.canvas,
+				deck,
+				{
+					setActivePath: (id) => paths.setActivePath(id),
+					stopEditing: () => paths.stopEditing(),
+					hasPath: (id) => paths.listPaths().some((p) => p.id === id),
+				},
+				0,
+				autoplay,
+				() => this.app.workspace.getActiveViewOfType(FileView) === this.view,
+				() => this.stopPresentation(),
+			),
+		);
+	}
+
+	stopPresentation(): void {
+		const view = this.presentation;
+		if (!view) return;
+		this.presentation = null;
+		this.removeChild(view);
+	}
+
+	presentationAct(action: PresentationAction): void {
+		this.presentation?.act(action);
+	}
+
 	private openDeckMenu(evt: MouseEvent): void {
 		const deck = this.currentDeck();
 		const readonly = this.canvas.isReadonly();
@@ -98,9 +144,21 @@ export class SlidesController extends Component {
 			);
 		});
 		menu.addSeparator();
-		// Wired up in phase 3.
-		menu.addItem((item) => item.setTitle("Start presentation").setIcon("play").setDisabled(true));
-		menu.addItem((item) => item.setTitle("Start auto-play").setIcon("timer").setDisabled(true));
+		const empty = deck.slides.length === 0;
+		menu.addItem((item) =>
+			item
+				.setTitle(empty ? "Start presentation (add a slide first)" : "Start presentation")
+				.setIcon("play")
+				.setDisabled(empty)
+				.onClick(() => this.startPresentation(false)),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(empty ? "Start auto-play (add a slide first)" : "Start auto-play")
+				.setIcon("timer")
+				.setDisabled(empty)
+				.onClick(() => this.startPresentation(true)),
+		);
 		menu.showAtMouseEvent(evt);
 	}
 

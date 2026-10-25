@@ -192,4 +192,15 @@ describe("getLiveCanvas", () => {
 		expect(view.canvas.deselects).toBe(1);
 		expect(view.canvas.saves).toEqual([]);
 	});
+
+	it("recognizes clicks on nodes, edges, and labels as item targets", () => {
+		const view = fakeView();
+		const live = getLiveCanvas(view)!;
+		const edge = view.canvas.edges.get("e1")!;
+		expect(live.isItemTarget(view.canvas.nodes.get("a")!.nodeEl)).toBe(true);
+		expect(live.isItemTarget(edge.lineGroupEl.children[0])).toBe(true);
+		expect(live.isItemTarget(edge.labelElement!.wrapperEl)).toBe(true);
+		expect(live.isItemTarget(view.canvas.canvasEl)).toBe(false);
+		expect(live.isItemTarget(null)).toBe(false);
+	});
 });
