@@ -3,6 +3,7 @@ import { CanvasToolsSettings, DEFAULT_SETTINGS } from "./settings";
 import { CanvasToolsSettingTab } from "./settings-tab";
 import { registerCommands } from "./commands";
 import { createApi, CanvasToolsAPI } from "./api";
+import { registerLiveCanvas } from "./live-canvas";
 
 export default class CanvasToolsPlugin extends Plugin {
 	settings!: CanvasToolsSettings;
@@ -12,6 +13,7 @@ export default class CanvasToolsPlugin extends Plugin {
 		await this.loadSettings();
 		this.api = createApi(this);
 		registerCommands(this);
+		registerLiveCanvas(this);
 		this.addSettingTab(new CanvasToolsSettingTab(this.app, this));
 	}
 
