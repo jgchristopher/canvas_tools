@@ -53,8 +53,15 @@ export class PathStore {
 	async renameCanvas(oldPath: string, newPath: string): Promise<void> {
 		const oldFile = this.fileFor(oldPath);
 		if (!(await this.adapter.exists(oldFile))) return;
-		const { set } = await this.load(oldPath);
-		await this.adapter.write(this.fileFor(newPath), serialize({ ...set, canvasPath: newPath }));
+		const newFile = this.fileFor(newPath);
+		const { set, corrupt } = await this.load(oldPath);
+		if (corrupt) {
+			// Move the unreadable bytes as-is; the next update sets them aside.
+			if (await this.adapter.exists(newFile)) await this.adapter.remove(newFile);
+			await this.adapter.rename(oldFile, newFile);
+			return;
+		}
+		await this.adapter.write(newFile, serialize({ ...set, canvasPath: newPath }));
 		await this.adapter.remove(oldFile);
 	}
 

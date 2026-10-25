@@ -102,6 +102,15 @@ describe("PathStore", () => {
 		expect((await store.load("old.canvas")).set.paths).toEqual([]);
 	});
 
+	it("keeps a corrupt file's bytes when its canvas is renamed", async () => {
+		const fs = memAdapter();
+		fs.files.set(`${DIR}/${pathFileKey("old.canvas")}.json`, "{oops");
+		const store = new PathStore(fs, DIR);
+		await store.renameCanvas("old.canvas", "new.canvas");
+		expect([...fs.files.values()]).toContain("{oops");
+		expect((await store.load("new.canvas")).corrupt).toBe(true);
+	});
+
 	it("ignores a rename for a canvas with no paths", async () => {
 		const fs = memAdapter();
 		await new PathStore(fs, DIR).renameCanvas("none.canvas", "other.canvas");
