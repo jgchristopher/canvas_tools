@@ -70,3 +70,12 @@ Desktop (macOS, Obsidian 1.15.0, jcOS vault), all checks run by John:
 | No errors in `dev:errors` after plugin reload | Pass |
 
 Pending: the phone checks (tap to toggle, menu, pill) and the two-machine sync check.
+
+## Verification after the storage change (2026-10-24, build 9aa2263)
+
+Paths are now stored in the `.canvas` file under `canvasToolsPaths`.
+
+- John migrated the two existing paths ("Workable - Merged", 14 edges, and "Worked - Comments", 19 edges) into Shepherd Factory Lifecycle through the live canvas save. All 33 edge ids resolved, and the diff showed only the new key added.
+- Desktop checks: pass (John).
+- **Mobile: pass (John).** The Paths button, tap-to-toggle, and switching paths all work on the phone. A path created on mobile ("mobile test", 6 edges) synced back to desktop through Obsidian Sync.
+- File diff after the mobile session: only `canvasToolsPaths` and the order of `nodes` changed. No node content changed. The reordering is Obsidian's own z-index sort in `Canvas.getData()`, applied on any save after a node is selected.
