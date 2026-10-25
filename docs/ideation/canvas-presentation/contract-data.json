@@ -1,0 +1,319 @@
+{
+  "projectName": "Canvas Presentation",
+  "slug": "canvas-presentation",
+  "date": "2026-10-25",
+  "status": "Approved",
+  "supersedes": null,
+  "gates": {
+    "dimensions": [
+      {
+        "key": "problem",
+        "label": "Problem Clarity",
+        "status": "ready",
+        "evidence": "John presents canvases mostly over screen-share in meetings (projector and unattended kiosk use also on the table) and today pans and zooms by hand between viewpoints."
+      },
+      {
+        "key": "goals",
+        "label": "Goal Definition",
+        "status": "ready",
+        "evidence": "Five goals: four locked from the strawman plus a per-slide path goal added when the scope-creep critic flagged per-slide paths as MVP work with no goal."
+      },
+      {
+        "key": "criteria",
+        "label": "Success Criteria",
+        "status": "ready",
+        "evidence": "Five command checks (slide-model, viewport-fit, autoplay/key-map, no-write, full suite/build/lint) plus five judgment checks mapped one-to-one to the goals; John approved the original set and critics added two command checks."
+      },
+      {
+        "key": "scope",
+        "label": "Scope Boundaries",
+        "status": "ready",
+        "evidence": "John accepted the strawman's MVP list and out-of-scope list (HTML export, transitions, speaker notes, thumbnails, multiple decks, true full-screen, drag reorder) as written."
+      },
+      {
+        "key": "consistency",
+        "label": "Consistency",
+        "status": "ready",
+        "evidence": "zoomToBbox's 100% zoom cap conflicts with replaying zoomed-in captures, resolved by a custom fit; exit behavior with path highlights resolved by John (clear all highlights)."
+      }
+    ]
+  },
+  "problem": [
+    "John walks people through Obsidian canvases (for example Shepherd Factory Lifecycle) by panning and zooming by hand. Mostly this happens over screen-share in meetings, sometimes on a projector, and possibly on an unattended display that should cycle on its own.",
+    "Hand navigation is slow, inconsistent between runs, and pulls attention away from the talk. There is no way to save a sequence of viewpoints, step through them with a keyboard or presentation clicker, or let the canvas cycle unattended."
+  ],
+  "goals": [
+    "Present a deck of 5+ slides on Shepherd Factory Lifecycle start to finish using only keyboard or clicker, with zero mouse panning or zooming.",
+    "Auto-play a deck unattended: it loops with each slide's own duration (10s default) for 10+ minutes without manual input.",
+    "The same deck, after Obsidian Sync, plays on John's phone using only the on-screen tap bar.",
+    "A presentation session that does not edit slides leaves the .canvas file byte-identical.",
+    "A slide can carry one saved highlight path: presenting that slide shows the path highlighted, and moving to a slide without a path shows no highlight."
+  ],
+  "successCriteria": [
+    {
+      "criterion": "Slide model: add, update-to-view, rename, move up/down, delete, set/clear path, set/clear duration, default duration, read/patch canvas data with missing/valid/corrupt values",
+      "check": {
+        "cmd": "npx vitest run test/live-canvas/slide-model.test.ts",
+        "expect": "exits 0"
+      }
+    },
+    {
+      "criterion": "Viewport fit: a rect captured at any zoom (including above 100%) replays to the same framing on the same screen size, and is centered and fully visible on a different screen size",
+      "check": {
+        "cmd": "npx vitest run test/live-canvas/viewport-fit.test.ts",
+        "expect": "exits 0"
+      }
+    },
+    {
+      "criterion": "Auto-play and key map logic: each slide's duration is used, missing duration falls back to 10s, the last slide wraps to the first, manual prev/next pauses auto-play, and each presentation key maps to the right action",
+      "check": {
+        "cmd": "npx vitest run test/live-canvas/autoplay.test.ts",
+        "expect": "exits 0"
+      }
+    },
+    {
+      "criterion": "A presentation session never saves: start, next/prev, Home/End, auto-play ticks, path apply and exit against a stub canvas call requestSave/setData 0 times",
+      "check": {
+        "cmd": "npx vitest run test/live-canvas/presentation-no-write.test.ts",
+        "expect": "exits 0"
+      }
+    },
+    {
+      "criterion": "Full suite, type-check/bundle, and lint pass",
+      "check": {
+        "cmd": "npx vitest run && npm run build && npm run lint",
+        "expect": "exits 0"
+      }
+    },
+    {
+      "criterion": "Goal 1: keyboard/clicker-only presentation of a 5+ slide deck",
+      "check": {
+        "judgment": "John presents a 5+ slide deck on Shepherd Factory Lifecycle using only arrow keys/Space/PageUp/PageDown and Esc, with no mouse pan or zoom"
+      }
+    },
+    {
+      "criterion": "Goal 2: unattended auto-play loop",
+      "check": {
+        "judgment": "John starts auto-play on a deck with mixed per-slide durations and confirms it loops with the right timing for 10+ minutes untouched"
+      }
+    },
+    {
+      "criterion": "Goal 3: phone playback via tap bar",
+      "check": {
+        "judgment": "John opens the synced canvas on his phone and runs the deck using only the tap bar (prev, next, play/pause, exit)"
+      }
+    },
+    {
+      "criterion": "Goal 4: no writes during a non-editing session",
+      "check": {
+        "judgment": "John records shasum of the .canvas file, runs a full presentation and auto-play session without editing slides, and confirms the shasum is unchanged"
+      }
+    },
+    {
+      "criterion": "Goal 5: per-slide path highlight",
+      "check": {
+        "judgment": "John builds a deck where some slides carry 'Workable - Merged' or 'Worked - Comments' and others none, presents it, and confirms each slide shows exactly its own path or no highlight"
+      }
+    }
+  ],
+  "scope": {
+    "mvp": [
+      {
+        "item": "Slides button in the canvas control bar with a menu: Add slide from current view, slide list, Start presentation, Start auto-play",
+        "reason": "Entry point, matching the Paths button pattern from PR #1"
+      },
+      {
+        "item": "Per-slide actions: Go to, Update to current view, Set/clear highlight path, Set duration, Rename, Move up, Move down, Delete",
+        "reason": "Everything needed to build and maintain a deck by tap. Desktop authoring is verified; mobile authoring uses the same menu but no criterion checks it (Goal 3 covers mobile playback only)"
+      },
+      {
+        "item": "Slide = captured canvas rect (from the current viewport) plus optional path id and optional duration",
+        "reason": "John chose captured view rects; paths reuse PR #1's highlighter"
+      },
+      {
+        "item": "Presentation mode: hides canvas UI, shows a tap bar (prev, n/total, next, play/pause, exit)",
+        "reason": "Works the same on screen-share, projector and phone"
+      },
+      {
+        "item": "Keys while presenting: Right/Space/PageDown next, Left/PageUp previous, Home/End, P play/pause, Esc exit; plus Next/Previous slide commands bindable in Hotkeys",
+        "reason": "PageUp/PageDown make presentation clickers work out of the box"
+      },
+      {
+        "item": "Go-to-slide fits the slide rect to the screen without the 100% zoom cap and applies its path highlight (or none)",
+        "reason": "Exact framing at any capture zoom; consistent highlight per slide"
+      },
+      {
+        "item": "Auto-play: per-slide durations with a 10s default, loops at the end, any manual navigation pauses it",
+        "reason": "Kiosk/unattended use is on the table"
+      },
+      {
+        "item": "Slides stored in the .canvas file under canvasToolsSlides, written through the canvas save as undo steps",
+        "reason": "Same sync-safe storage as paths (Obsidian Sync does not sync plugin subfolders)"
+      },
+      {
+        "item": "Exit clears all path highlights; starting a presentation ends path edit mode",
+        "reason": "John chose clear-all on exit"
+      }
+    ],
+    "full": [],
+    "stretch": [],
+    "outOfScope": [
+      {
+        "item": "Slides in the HTML export",
+        "reason": "Live canvas only for now"
+      },
+      {
+        "item": "Transitions beyond Obsidian's own pan/zoom animation",
+        "reason": "Not needed for the goals"
+      },
+      {
+        "item": "Speaker notes and presenter view",
+        "reason": "Not requested"
+      },
+      {
+        "item": "Slide thumbnails",
+        "reason": "Menu list by name is enough"
+      },
+      {
+        "item": "Multiple decks per canvas",
+        "reason": "One deck per canvas keeps storage and UI simple"
+      },
+      {
+        "item": "True browser full-screen",
+        "reason": "John chose canvas-UI-only hiding; Obsidian's own full-screen covers the rest"
+      },
+      {
+        "item": "Drag-to-reorder panel",
+        "reason": "John chose move up/down in the menu"
+      },
+      {
+        "item": "Swipe gestures",
+        "reason": "Conflict with canvas pan; John chose the tap bar"
+      }
+    ],
+    "future": [
+      "Slides in the interactive HTML export",
+      "Speaker notes",
+      "Group-linked slides that follow a group when it moves"
+    ]
+  },
+  "decisions": [
+    {
+      "decision": "A slide is a captured canvas rect from the current view",
+      "rejected": "A slide points at a group or node and zooms to fit it",
+      "reason": "Matches 'view points' literally and needs no groups per framing"
+    },
+    {
+      "decision": "A slide can optionally show one highlight path",
+      "rejected": "Views only",
+      "reason": "Lets John walk routes like 'Workable - Merged' as slides, reusing PR #1"
+    },
+    {
+      "decision": "Auto-play is in the MVP",
+      "rejected": "Full tier after manual presenting",
+      "reason": "John wants unattended use available from the first version"
+    },
+    {
+      "decision": "Built-in presentation keys plus bindable Next/Previous commands",
+      "rejected": "Commands only, or built-in keys only",
+      "reason": "Clickers work out of the box and keys stay customizable"
+    },
+    {
+      "decision": "Presentation mode hides canvas UI only",
+      "rejected": "True browser full-screen",
+      "reason": "Fewer edge cases (Esc, popouts, mobile); Obsidian's full-screen covers projector use"
+    },
+    {
+      "decision": "Per-slide durations with a default",
+      "rejected": "One interval per deck",
+      "reason": "John wants per-slide control for kiosk loops"
+    },
+    {
+      "decision": "On-screen tap bar for touch navigation",
+      "rejected": "Swipe gestures",
+      "reason": "No conflict with canvas pan and pinch"
+    },
+    {
+      "decision": "Reorder with Move up/down in the menu",
+      "rejected": "Drag-to-reorder panel",
+      "reason": "Plain tap actions, far less UI"
+    },
+    {
+      "decision": "Exit clears all path highlights",
+      "rejected": "Restore the path showing before the presentation",
+      "reason": "John's choice"
+    },
+    {
+      "decision": "Custom viewport fit (set tx/ty/tZoom) instead of zoomToBbox",
+      "rejected": "Obsidian's zoomToBbox",
+      "reason": "zoomToBbox caps zoom at 100% and adds 10% padding, so zoomed-in captures would not replay as framed"
+    },
+    {
+      "decision": "Phase 1 starts with a viewport spike and is rated medium risk",
+      "rejected": "Treat viewport internals as known, low risk",
+      "reason": "Hidden-dependency critic: the spike doc has no viewport section"
+    },
+    {
+      "decision": "Slides and paths share one per-view Highlighter via a path-controller API",
+      "rejected": "A separate slide highlighter",
+      "reason": "Hidden-dependency critic: two highlighters would overwrite each other's ct-path-* classes and the 300ms data poll"
+    },
+    {
+      "decision": "Presentation captures keys before the canvas and blocks node select/drag/nudge",
+      "rejected": "Plain key listeners alongside canvas handling",
+      "reason": "Hidden-dependency critic: Space pans and arrows nudge nodes, and a nudge or selection saves the file, breaking Goal 4"
+    },
+    {
+      "decision": "Auto-play and key map are pure modules with fake-timer tests; a no-write test guards Goal 4",
+      "rejected": "Only judgment checks for auto-play and no-write",
+      "reason": "Success-criteria critic: both are mechanical properties a command can check"
+    },
+    {
+      "decision": "Per-slide paths stay in MVP with their own goal (Goal 5)",
+      "rejected": "Move per-slide paths to a later tier",
+      "reason": "Scope-creep critic flagged MVP work with no goal; John chose the feature, so a goal was added instead"
+    }
+  ],
+  "execution": {
+    "strategy": "Sequential",
+    "phases": [
+      {
+        "title": "Slide model, viewport fit, internals",
+        "risk": "medium",
+        "blocking": true,
+        "specPath": "docs/ideation/canvas-presentation/spec-phase-1.md",
+        "notes": "Starts with a viewport spike recorded in docs/superpowers/spikes/2026-10-24-canvas-internals.md: fields to read/write (tx/ty/tZoom, getViewportBBox, canvasRect), redraw call (markViewportChanged), and confirmation that viewport changes never call requestSave. Then pure slide-model and viewport-fit modules with tests; LiveCanvas gains viewport read/write and screen size"
+      },
+      {
+        "title": "Slides menu",
+        "risk": "medium",
+        "blocking": true,
+        "prereqs": [
+          "Slide model, viewport fit, internals"
+        ],
+        "specPath": "docs/ideation/canvas-presentation/spec-phase-2.md",
+        "notes": "Slides toolbar button and per-slide actions, written through the canvas save. Refactors CanvasPathController to expose a small API (show path by id, clear highlight, stop edit mode) so the slides controller drives the single per-view Highlighter instead of a second one fighting over ct-path-* classes; registerLiveCanvas creates both controllers per view"
+      },
+      {
+        "title": "Presentation mode and auto-play",
+        "risk": "high",
+        "blocking": true,
+        "prereqs": [
+          "Slides menu"
+        ],
+        "specPath": "docs/ideation/canvas-presentation/spec-phase-3.md",
+        "notes": "Starts with a spike: which canvas UI elements to hide on desktop and mobile, and how canvas binds Space (hold-to-pan) and arrow keys (node nudge). Presentation captures its keys in the capture phase on the canvas wrapper (or an Obsidian Scope) and stops propagation, and blocks node select/drag/nudge while presenting so nothing can trigger a save. Tap bar, path per slide via the path-controller API, pure autoplay and key-map modules with fake-timer tests, and a no-write test against a stub canvas"
+      },
+      {
+        "title": "Hands-on verification",
+        "kind": "gate",
+        "prereqs": [
+          "Presentation mode and auto-play"
+        ],
+        "notes": "First deploy the build to the phone (community-plugin sync or manual install) and reload the plugin there. Then John runs the five judgment checks on desktop and phone"
+      }
+    ]
+  },
+  "approvedOn": "2026-10-25",
+  "approvedBy": "John"
+}
