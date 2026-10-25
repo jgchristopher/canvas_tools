@@ -651,3 +651,50 @@ Append a "Verification" section to the spike doc with pass or fail for each item
 git add docs/superpowers/spikes/2026-10-24-canvas-internals.md
 git commit -m "docs: record canvas path highlight verification"
 ```
+
+---
+
+### Task 8: Store paths in the canvas file (spec revision 2026-10-24)
+
+Obsidian Sync never syncs files in plugin subfolders, so `<plugin dir>/paths/*.json` never reached other machines. John chose to store paths inside the `.canvas` file instead. See the spec's Data section. This task replaces Task 3's store.
+
+**Files:**
+- Delete: `src/live-canvas/path-store.ts`, `test/live-canvas/path-store.test.ts`
+- Modify: `src/live-canvas/path-model.ts`, `test/live-canvas/path-model.test.ts`, `src/live-canvas/canvas-internals.ts`, `test/live-canvas/canvas-internals.test.ts`, `src/live-canvas/controller.ts`, `src/live-canvas/index.ts`
+
+**Interfaces:**
+- `path-model.ts` changes:
+  ```ts
+  export const PATHS_KEY = "canvasToolsPaths";
+  export const CORRUPT_KEY = "canvasToolsPathsCorrupt";
+  export interface CanvasPathSet { version: 1; paths: CanvasPath[] }      // canvasPath removed
+  export function emptyPathSet(): CanvasPathSet;
+  export function parsePathSet(value: unknown): CanvasPathSet | null;      // takes the parsed value, not a string
+  export interface ReadResult { set: CanvasPathSet; corrupt: boolean }
+  export function readPathSet(canvasData: unknown): ReadResult;            // missing key → empty, not corrupt
+  export function pathSetPatch(canvasData: unknown, set: CanvasPathSet): Record<string, unknown>;
+  // returns { [PATHS_KEY]: set }, plus { [CORRUPT_KEY]: <old value> } when the current value is corrupt
+  ```
+- `LiveCanvas` gains:
+  ```ts
+  readData(): unknown;                                // canvas.data, read live; its identity changes on every save, undo, and reload
+  writeData(patch: Record<string, unknown>): void;    // Object.assign(canvas.data, patch); canvas.requestSave(true)
+  isReadonly(): boolean;                              // canvas.readonly
+  ```
+  `getLiveCanvas` returns `null` when `canvas.data` isn't an object or `canvas.requestSave` isn't a function.
+- The controller drops `PathStore` and the write queue. It reads the set live (`readPathSet(canvas.readData())`), and writes with `canvas.writeData(pathSetPatch(...))`. A `registerInterval` (300ms) compares `canvas.readData()` identity to the last value it saw, and calls `showActive()` on change. That covers undo, redo, and sync reloads. Edit actions are disabled while `canvas.isReadonly()`.
+- `index.ts` drops the store and the vault `delete` handler. The `rename` handler only retargets controllers.
+
+- [ ] **Step 1:** Rewrite the model tests for the new `emptyPathSet`/`parsePathSet` signatures, and add:
+  - `readPathSet` with the key missing, valid, and corrupt
+  - `pathSetPatch` returns only the plugin keys
+  - a corrupt value is moved to `CORRUPT_KEY`
+
+  Run them and watch them fail.
+- [ ] **Step 2:** Implement, and watch the tests pass.
+- [ ] **Step 3:** Add internals tests: `readData` and `writeData` (patch assigned, `requestSave` called with `true`), `isReadonly`, and `null` when `data` or `requestSave` is missing. Watch them fail, implement, and watch them pass.
+- [ ] **Step 4:** Rework the controller and `index.ts`, delete the store files, then run `npx vitest run && npm run build && npm run lint`, all exit 0.
+- [ ] **Step 5:** Commit. Reinstall into the vault and re-run the Task 7 desktop checklist, plus:
+  - a diff after path edits shows only `canvasToolsPaths` changed
+  - Cmd+Z undoes a toggle
+  - a highlight-only session leaves the file byte-identical

@@ -12,7 +12,7 @@ Today the plugin only exports canvases (HTML, Excalidraw). It never touches the 
 - An edge can belong to any number of paths. Routes share edges in practice (e.g. `Start → Login` is common to every route).
 - Highlight **one path at a time** in the live Obsidian canvas view.
 - Drive everything from a **toolbar button** in the canvas's control bar.
-- Keep the `.canvas` file and edge labels untouched. Path membership lives in plugin-owned files.
+- Keep edge labels untouched. Path data lives in the `.canvas` file under one plugin-owned top-level key, written only when the user edits paths (revised 2026-10-24, see Data).
 - **Works on touch** (iOS, Android, tablets) as well as mouse. Nothing in the flow may depend on shift-click, hover, or right-click.
 - **Safe across synced machines.** John edits canvases on more than one machine. Editing paths on one machine must not wipe paths edited on another.
 
@@ -26,7 +26,8 @@ Today the plugin only exports canvases (HTML, Excalidraw). It never touches the 
 
 ## Anti-goals
 
-- Writing anything into the `.canvas` file, including through Obsidian's own save. Highlighting must be purely visual. If dimming were done by changing edge/node data (e.g. setting colors), Obsidian would persist it.
+- Writing to the `.canvas` file when the user didn't edit paths. Showing, switching, or clearing a highlight must be purely visual and never mark the canvas dirty. If dimming were done by changing edge/node data (e.g. setting colors), Obsidian would persist it.
+- Touching any part of the `.canvas` JSON besides the plugin's own top-level key: no changes to nodes, edges, or other keys.
 - Text added to edge labels.
 - Leaking styles or listeners after the canvas closes, the path is cleared, or the plugin unloads.
 
@@ -74,18 +75,32 @@ Delete active path…
 
 ## Data
 
-**Not in `data.json`.** That file is rewritten whole on every save, so two synced machines editing different canvases would clobber each other (and could wipe `linkPreviewCache`).
+**Stored inside the `.canvas` file**, under one top-level key, `"canvasToolsPaths"`. John chose this on 2026-10-24.
 
-**One file per canvas** in the plugin's own folder: `<plugin dir>/paths/<key>.json`, written through `app.vault.adapter` (my call). Separate files mean edits to different canvases never conflict. Placing them in the plugin folder keeps them out of the file explorer, and they sync wherever the plugin folder syncs. A visible vault folder was considered and dropped: it clutters the vault, and a dot-folder doesn't sync under Obsidian Sync.
+**Why it changed.** The first build kept one JSON file per canvas in `<plugin dir>/paths/`. Desktop checks all passed. Then a look at Obsidian Sync's source showed it syncs only `manifest.json`, `main.js`, `styles.css`, and `data.json` inside each plugin folder, so path files never reached other machines. Three alternatives were weighed:
 
-- `<key>` is derived from the canvas's vault path (builder's call: slug, hash, or both). The file also stores the canvas path inside it.
-- **Read before every write.** Each edit re-reads that canvas's file, applies the one change, and writes it back. This keeps the overwrite window tiny when two machines edit the same canvas.
-- **Pick up remote changes.** When a canvas view opens, and when the menu opens, re-read the file so paths edited on another machine show up. Builder's call whether to also poll or watch the file while a canvas is open.
-- Concurrent edits to the *same* canvas on two machines at the same moment can still lose one side. Accepted for v1.
+- **`data.json`:** synced, but it's one file for every canvas. Offline edits on two machines can wipe each other's paths on any canvas. Rejected.
+- **One Markdown file per canvas in a visible vault folder:** synced and conflict-safe across canvases, but it clutters the file explorer. Rejected.
+- **Inside the `.canvas` file:** chosen. It always syncs because it is the canvas, and renames, moves, and deletes need no handling. The cost is that editing paths now modifies the canvas file, which reverses the original anti-goal.
+
+**Verified in Obsidian 1.15.0 source:**
+
+- `Canvas.getData()` returns `{ ...this.data, nodes, edges }`, so unknown top-level keys survive every save Obsidian makes.
+- `Canvas.requestSave(pushHistory = true)` refreshes `canvas.data` from `getData()`, pushes an undo snapshot, and calls the view's debounced save.
+- `setViewData` (file reload, including a sync bringing a newer version) replaces `canvas.data`.
+
+**How writes work:**
+
+- Path edits go through the open canvas, never `vault.modify` behind its back. Set `canvas.data.canvasToolsPaths`, then call `canvas.requestSave(true)`.
+- Path edits become **undo steps**. Undo restores whole-canvas snapshots, so skipping the snapshot would let a later undo of an unrelated edit silently revert a path change. With snapshots, Cmd+Z after a toggle undoes the toggle.
+- **Reads are live.** The controller reads `canvas.data.canvasToolsPaths` whenever it needs the set (menu open, after an undo or reload). It never trusts a cached copy, so a synced-in version or an undo shows up.
+- Concurrent edits to the *same* canvas on two machines can still lose one side, the same as any canvas edit under Sync. Accepted for v1.
+- Read-only canvases (`canvas.readonly`) disable the edit actions.
 
 ```ts
+// value of the "canvasToolsPaths" key
 interface CanvasPathSet {
-	canvasPath: string;  // vault path of the canvas this belongs to
+	version: 1;
 	paths: CanvasPath[];
 }
 
@@ -96,13 +111,11 @@ interface CanvasPath {
 }
 ```
 
-- **Rename/move** a canvas file inside Obsidian → move its file (listen to `vault.on("rename")`).
-- **Delete** a canvas file → delete its file.
-- A canvas renamed *outside* Obsidian (Finder, git) orphans its paths. Accepted for v1.
-- **Edge ids that no longer exist** in the canvas are ignored when highlighting. Pruning them from storage is the builder's call (lazy prune on load is fine). Don't prune during a live session in a way that would lose membership if the user undoes an edge deletion.
+- **Edge ids that no longer exist** in the canvas are ignored when highlighting, never pruned. Undoing an edge deletion brings it back lit.
 - Edges are identified by the `id` field in the `.canvas` JSON. Obsidian keeps these stable across saves.
 - Only the active path id is in memory per view. It is never saved.
-- A missing or corrupt path file means "no paths yet" for that canvas, and a notice, never a crash.
+- A missing key means "no paths yet". A key with a value that doesn't parse means "no paths" plus a one-time notice. The first path edit moves the bad value to `"canvasToolsPathsCorrupt"` before writing, so nothing is silently destroyed.
+- **Migration:** paths made with the first build live in `<plugin dir>/paths/*.json` and are not migrated (one test canvas on one machine). The old folder can be deleted by hand.
 
 ## Integration with Obsidian's canvas (risk)
 
@@ -128,7 +141,7 @@ Requirements that follow from the risk:
 Following the repo's conventions (small `main.ts`, single-responsibility modules, ~200–300 lines max per file):
 
 - `src/live-canvas/canvas-internals.ts` — the only file that touches undocumented canvas objects.
-- `src/live-canvas/path-store.ts` — per-canvas file read/modify/write, rename/delete handling. Keep the path-set transformations (add path, toggle edge, rename) as pure functions so they're testable without the adapter.
+- `src/live-canvas/path-model.ts` — pure path-set transformations (add path, toggle edge, rename), plus reading the set out of canvas data and writing it back.
 - `src/live-canvas/highlighter.ts` — given a view and a set of edge ids, applies/removes classes.
 - `src/live-canvas/edit-mode.ts` — tap-to-toggle, the Done control, suppressing Obsidian's edge handling while active.
 - `src/live-canvas/toolbar.ts` — the button and its menu.
@@ -139,11 +152,12 @@ Exact split is the builder's call.
 
 ## Testing
 
-- **Unit tests (vitest)** for `path-store`: create/rename/delete paths, toggle edges, shared edges across paths, canvas rename and delete, missing and corrupt files, read-before-write picking up a change made by "another machine" between two edits.
+- **Unit tests (vitest)** for `path-model`: create/rename/delete paths, toggle edges, shared edges across paths, reading from canvas data with the key missing, valid, or corrupt, writing back without touching `nodes`, `edges`, or other keys, and moving a corrupt value aside.
 - **Unit tests** for the "which nodes are on the path" calculation: a pure function from edge list + path edge ids to node ids.
 - `highlighter`, `edit-mode`, and `toolbar` touch the live DOM and internals. Test whatever can be isolated against `test/stubs/obsidian.ts`. Beyond that, verify by hand in the jcOS vault (plugin installed at `.obsidian/plugins/canvas-tools/`) on a canvas with two routes that share edges, on desktop and on a phone.
 - Manual sync check: edit paths on canvas X on one machine and canvas Y on another, let sync settle, and confirm both survive.
-- Manual check: confirm the `.canvas` file is byte-identical before and after a highlight session that included pan/zoom and switching paths.
+- Manual check: confirm the `.canvas` file is byte-identical before and after a highlight session that included pan/zoom and switching paths, with no path edits.
+- Manual check: after path edits, a diff of the `.canvas` file shows only the `canvasToolsPaths` key changed. Cmd+Z undoes the last toggle.
 
 ## Decisions made in conversation
 
@@ -156,12 +170,15 @@ Exact split is the builder's call.
 - Entry point: toolbar button on the canvas.
 - Used across multiple synced machines.
 - v1 must be touch-friendly.
+- Path data stored inside the `.canvas` file (chosen after Obsidian Sync was found not to sync plugin subfolders).
 
 ## Calls I made (John to check)
 
 - Marking edges is a tap-to-toggle edit mode, not "select edges, then add". It works the same on touch and mouse.
-- Path data lives in one JSON file per canvas in the plugin's folder, not in `data.json` and not in a visible vault folder. It syncs only if your sync covers `.obsidian/plugins/`.
-- Simultaneous edits to the same canvas on two machines can still lose one side. Renames outside Obsidian orphan paths. Both accepted for v1.
+- Top-level key name `canvasToolsPaths`.
+- Path edits are undo steps (needed for correctness, see Data).
+- Paths from the first build's `paths/` folder are not migrated.
+- Simultaneous edits to the same canvas on two machines can still lose one side. Accepted for v1.
 - If the internals spike finds a blocker, work stops and comes back to you.
 - Accent color comes from the theme (`--interactive-accent`).
 - Active path is not remembered across close/reopen.
