@@ -45,6 +45,26 @@ function fakeView() {
 			requestSave(pushHistory: boolean) {
 				this.saves.push(pushHistory);
 			},
+			history: { data: [{ nodes: [], edges: [] }, { nodes: [], edges: [], canvasToolsSlides: "old" }] as Record<string, unknown>[], current: 1 },
+			canvasRect: { width: 1600, height: 900 },
+			x: 10,
+			y: 20,
+			zoom: 0,
+			tx: 10,
+			ty: 20,
+			tZoom: 0,
+			zoomCenter: { x: 1, y: 1 } as { x: number; y: number } | null,
+			marks: 0,
+			deselects: 0,
+			getViewportBBox() {
+				return { minX: -790, minY: -430, maxX: 810, maxY: 470 };
+			},
+			markViewportChanged() {
+				this.marks++;
+			},
+			deselectAll() {
+				this.deselects++;
+			},
 		},
 	};
 }
@@ -121,11 +141,11 @@ describe("getLiveCanvas", () => {
 		expect(live.readData()).toBe(next);
 	});
 
-	it("writes a patch onto canvas data and saves with an undo step", () => {
+	it("writes a patch onto canvas data and saves without an undo step", () => {
 		const view = fakeView();
 		getLiveCanvas(view)!.writeData({ canvasToolsPaths: { version: 1, paths: [] } });
 		expect(view.canvas.data).toEqual({ nodes: [], edges: [], canvasToolsPaths: { version: 1, paths: [] } });
-		expect(view.canvas.saves).toEqual([true]);
+		expect(view.canvas.saves).toEqual([false]);
 	});
 
 	it("reports read-only state live", () => {
@@ -134,5 +154,73 @@ describe("getLiveCanvas", () => {
 		expect(live.isReadonly()).toBe(false);
 		view.canvas.readonly = true;
 		expect(live.isReadonly()).toBe(true);
+	});
+
+	it("returns null when viewport internals are missing", () => {
+		for (const key of ["getViewportBBox", "markViewportChanged", "deselectAll", "canvasRect"]) {
+			expect(getLiveCanvas({ canvas: { ...fakeView().canvas, [key]: undefined } })).toBeNull();
+		}
+	});
+
+	it("reads the visible rect and screen size", () => {
+		const live = getLiveCanvas(fakeView())!;
+		expect(live.getViewportRect()).toEqual({ minX: -790, minY: -430, maxX: 810, maxY: 470 });
+		expect(live.getScreenSize()).toEqual({ width: 1600, height: 900 });
+	});
+
+	it("animates to a viewport by setting only the target", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.setViewport({ x: 100, y: 200, zoom: 0.5 }, true);
+		const c = view.canvas;
+		expect([c.tx, c.ty, c.tZoom, c.zoomCenter]).toEqual([100, 200, 0.5, null]);
+		expect([c.x, c.y, c.zoom]).toEqual([10, 20, 0]);
+		expect(c.marks).toBe(1);
+		expect(c.saves).toEqual([]);
+	});
+
+	it("jumps to a viewport by also setting the current position", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.setViewport({ x: 100, y: 200, zoom: 0.5 }, false);
+		const c = view.canvas;
+		expect([c.x, c.y, c.zoom, c.tx, c.ty, c.tZoom]).toEqual([100, 200, 0.5, 100, 200, 0.5]);
+		expect(c.marks).toBe(1);
+		expect(c.saves).toEqual([]);
+	});
+
+	it("clears the selection without saving", () => {
+		const view = fakeView();
+		getLiveCanvas(view)!.deselectAll();
+		expect(view.canvas.deselects).toBe(1);
+		expect(view.canvas.saves).toEqual([]);
+	});
+
+	it("recognizes clicks on nodes, edges, and labels as item targets", () => {
+		const view = fakeView();
+		const live = getLiveCanvas(view)!;
+		const edge = view.canvas.edges.get("e1")!;
+		expect(live.isItemTarget(view.canvas.nodes.get("a")!.nodeEl)).toBe(true);
+		expect(live.isItemTarget(edge.lineGroupEl.children[0])).toBe(true);
+		expect(live.isItemTarget(edge.labelElement!.wrapperEl)).toBe(true);
+		expect(live.isItemTarget(view.canvas.canvasEl)).toBe(false);
+		expect(live.isItemTarget(null)).toBe(false);
+	});
+
+	it("writes outside undo by patching every history snapshot", () => {
+		const view = fakeView();
+		const patch = { canvasToolsSlides: { version: 1, slides: [] } };
+		getLiveCanvas(view)!.writeData(patch);
+		expect(view.canvas.saves).toEqual([false]);
+		expect(view.canvas.data.canvasToolsSlides).toEqual(patch.canvasToolsSlides);
+		for (const snapshot of view.canvas.history.data) {
+			expect(snapshot.canvasToolsSlides).toEqual(patch.canvasToolsSlides);
+		}
+	});
+
+	it("patches path data into history snapshots too", () => {
+		const view = fakeView();
+		const paths = { version: 1, paths: [] };
+		getLiveCanvas(view)!.writeData({ canvasToolsPaths: paths });
+		expect(view.canvas.saves).toEqual([false]);
+		for (const snapshot of view.canvas.history.data) expect(snapshot.canvasToolsPaths).toEqual(paths);
 	});
 });

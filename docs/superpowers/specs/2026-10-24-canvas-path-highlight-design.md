@@ -92,7 +92,7 @@ Delete active path…
 **How writes work:**
 
 - Path edits go through the open canvas, never `vault.modify` behind its back. Set `canvas.data.canvasToolsPaths`, then call `canvas.requestSave(true)`.
-- Path edits become **undo steps**. Undo restores whole-canvas snapshots, so skipping the snapshot would let a later undo of an unrelated edit silently revert a path change. With snapshots, Cmd+Z after a toggle undoes the toggle.
+- Path edits sit **outside undo history** (revised 2026-10-25, John). Undo restores whole-canvas snapshots, so as undo steps a Cmd+Z on an unrelated edit could silently revert path data. Writes now use `requestSave(false)` and patch every snapshot in `canvas.history.data` with the new value, so undo and redo never change paths. Paths change only through explicit path actions.
 - **Reads are live.** The controller reads `canvas.data.canvasToolsPaths` whenever it needs the set (menu open, after an undo or reload). It never trusts a cached copy, so a synced-in version or an undo shows up.
 - Concurrent edits to the *same* canvas on two machines can still lose one side, the same as any canvas edit under Sync. Accepted for v1.
 - Read-only canvases (`canvas.readonly`) disable the edit actions.
@@ -157,7 +157,7 @@ Exact split is the builder's call.
 - `highlighter`, `edit-mode`, and `toolbar` touch the live DOM and internals. Test whatever can be isolated against `test/stubs/obsidian.ts`. Beyond that, verify by hand in the jcOS vault (plugin installed at `.obsidian/plugins/canvas-tools/`) on a canvas with two routes that share edges, on desktop and on a phone.
 - Manual sync check: edit paths on canvas X on one machine and canvas Y on another, let sync settle, and confirm both survive.
 - Manual check: confirm the `.canvas` file is byte-identical before and after a highlight session that included pan/zoom and switching paths, with no path edits.
-- Manual check: after path edits, a diff of the `.canvas` file shows only the `canvasToolsPaths` key changed. Cmd+Z undoes the last toggle.
+- Manual check: after path edits, a diff of the `.canvas` file shows only the `canvasToolsPaths` key changed. Cmd+Z after a path edit leaves paths unchanged.
 
 ## Decisions made in conversation
 
@@ -176,7 +176,7 @@ Exact split is the builder's call.
 
 - Marking edges is a tap-to-toggle edit mode, not "select edges, then add". It works the same on touch and mouse.
 - Top-level key name `canvasToolsPaths`.
-- Path edits are undo steps (needed for correctness, see Data).
+- Path edits are kept out of undo history (John, 2026-10-25, after undo reverted slide settings). Previously they were undo steps.
 - Paths from the first build's `paths/` folder are not migrated.
 - Simultaneous edits to the same canvas on two machines can still lose one side. Accepted for v1.
 - If the internals spike finds a blocker, work stops and comes back to you.

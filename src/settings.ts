@@ -13,6 +13,7 @@ export interface CanvasToolsSettings {
 	htmlInteractive: boolean;
 	openHtmlAfterExport: boolean;
 	linkPreviewCache: Record<string, LinkPreviewCacheEntry>;
+	hideCardMenu: boolean;
 }
 
 export interface LinkPreviewCacheEntry {
@@ -32,4 +33,5 @@ export const DEFAULT_SETTINGS: CanvasToolsSettings = {
 	htmlInteractive: true,
 	openHtmlAfterExport: true,
 	linkPreviewCache: {},
+	hideCardMenu: false,
 };
