@@ -108,7 +108,7 @@ export class SlidesController extends Component {
 - **Go to (outside presentation).**
   - Fits the slide and applies its path, or clears the path if it has none.
   - A `pathId` that no longer exists counts as no path.
-- **Update to current view.** Replaces the slide's rect.
+- **Update to current view.** Replaces the slide's rect and its path with the one highlighted now, or clears the path if none is. (Revised 2026-10-25, along with Add slide capturing the highlighted path.)
 - **Highlight path….** Opens the path picker:
   - "No path" clears it.
   - Picking a path sets it.

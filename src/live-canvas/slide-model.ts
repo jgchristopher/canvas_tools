@@ -41,8 +41,9 @@ export function addSlide(deck: SlideDeck, id: string, name: string, rect: Rect, 
 	return { ...deck, slides: [...deck.slides, slide] };
 }
 
-export function updateSlideRect(deck: SlideDeck, id: string, rect: Rect): SlideDeck {
-	return mapSlide(deck, id, (s) => ({ ...s, rect: { ...rect } }));
+// Re-captures a slide: new framing plus whatever path is highlighted now.
+export function updateSlideView(deck: SlideDeck, id: string, rect: Rect, pathId: string | null): SlideDeck {
+	return mapSlide(deck, id, (s) => withOptional({ ...s, rect: { ...rect } }, "pathId", pathId ?? undefined));
 }
 
 export function renameSlide(deck: SlideDeck, id: string, name: string): SlideDeck {

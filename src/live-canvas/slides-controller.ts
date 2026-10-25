@@ -19,7 +19,7 @@ import {
 	Slide,
 	SlideDeck,
 	slideDuration,
-	updateSlideRect,
+	updateSlideView,
 } from "./slide-model";
 import type { PresentationAction } from "./presentation-keys";
 import { PresentationView } from "./presentation-view";
@@ -180,7 +180,7 @@ export class SlidesController extends Component {
 				.setDisabled(readonly)
 				.onClick(() => {
 					const rect = this.capturedRect();
-					if (rect) this.mutate((d) => updateSlideRect(d, id, rect));
+					if (rect) this.mutate((d) => updateSlideView(d, id, rect, this.paths.activePathId));
 				}),
 		);
 		menu.addItem((item) =>

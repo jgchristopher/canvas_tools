@@ -16,7 +16,7 @@ import {
 	SLIDES_CORRUPT_KEY,
 	SLIDES_KEY,
 	slideDuration,
-	updateSlideRect,
+	updateSlideView,
 } from "../../src/live-canvas/slide-model";
 
 const r = (minX: number, minY: number, maxX: number, maxY: number) => ({ minX, minY, maxX, maxY });
@@ -49,8 +49,15 @@ describe("slide transforms", () => {
 		expect("pathId" in addSlide(emptyDeck(), "s8", "Plain", r(0, 0, 1, 1), null).slides[0]).toBe(false);
 	});
 
-	it("updates a slide's rect", () => {
-		expect(updateSlideRect(three(), "s2", r(1, 2, 3, 4)).slides[1].rect).toEqual(r(1, 2, 3, 4));
+	it("updates a slide's rect and keeps its other settings", () => {
+		const d = setSlideDuration(setSlidePath(three(), "s2", "old"), "s2", 30);
+		const s = updateSlideView(d, "s2", r(1, 2, 3, 4), "new").slides[1];
+		expect(s).toEqual({ id: "s2", name: "Flow", rect: r(1, 2, 3, 4), pathId: "new", durationSec: 30 });
+	});
+
+	it("clears the path when updated with nothing highlighted", () => {
+		const d = setSlidePath(three(), "s2", "old");
+		expect("pathId" in updateSlideView(d, "s2", r(1, 2, 3, 4), null).slides[1]).toBe(false);
 	});
 
 	it("renames with trimming", () => {
