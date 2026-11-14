@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  Implementation-notes shell — copied VERBATIM by execute-spec on the first logged entry.
+  This file is the single owner of the implementation-notes format. Do not restate its
+  structure or styles elsewhere; change the format here and every future phase inherits it.
+  Copier substitutes: 1 (phase number, twice), Canvas Presentation, 2026-10-25, Slide model, viewport fit, internals —
+  then deletes the example entry and appends real ones inside <main class="doc-content">.
+-->
+<html lang="en" data-theme="auto">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Implementation Notes — Phase 1</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f7f3;
+        --fg: #191b1d;
+        --muted: #50555a;
+        --border: #dededf;
+        --accent: #2b46c7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #131417;
+          --fg: #e9e9e4;
+          --muted: #a8aaa6;
+          --border: #2d3036;
+          --accent: #93a7ff;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0 auto;
+        max-width: 46rem;
+        padding: 2rem 1.25rem 4rem;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .doc-header { border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }
+      .doc-header h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+      .doc-meta { margin: 0; color: var(--muted); font-size: 0.875rem; }
+      .note-entry { border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+      .note-entry h3 { margin: 0 0 0.75rem; font-size: 1.05rem; color: var(--accent); }
+      .note-entry dl { margin: 0; }
+      .note-entry dt { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.75rem; }
+      .note-entry dt:first-child { margin-top: 0; }
+      .note-entry dd { margin: 0.15rem 0 0; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.9em;
+        background: color-mix(in srgb, var(--fg) 8%, transparent);
+        padding: 0.1em 0.3em;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="doc-header">
+      <h1>Implementation Notes — Phase 1</h1>
+      <p class="doc-meta">Canvas Presentation · 2026-10-25 · Slide model, viewport fit, internals</p>
+    </header>
+    <main class="doc-content">
+      <section class="note-entry">
+        <h3>Process — scout skipped</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>execute-spec invokes the ideation:scout agent from the session working directory, which is the jcOS vault, not the repo worktree.</dd>
+          <dt>Decision</dt>
+          <dd>Explored inline. The codebase was already mapped while building PR #1, and every pattern file named in the spec was read directly.</dd>
+          <dt>Alternative</dt>
+          <dd>Run the scout with absolute paths, but its globbing and grep would have been rooted in the vault.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Viewport spike — animation not observed live</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec asked to confirm that writing tx/ty/tZoom animates the view. The Obsidian window was hidden (visibilityState hidden), so requestAnimationFrame never fired.</dd>
+          <dt>Decision</dt>
+          <dd>Confirmed the easing and clamping from the frame-loop source, and confirmed live that a viewport write causes 0 saves and no data or file change. The visual animation check moves to the Phase 2 manual tests.</dd>
+          <dt>Alternative</dt>
+          <dd>Ask John to bring Obsidian to the front mid-run.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>viewport-fit — zero-size screen</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec said fitRect should return "the current viewport unchanged" for a 0×0 screen, but fitRect is pure and has no current viewport.</dd>
+          <dt>Decision</dt>
+          <dd>For a 0×0 screen, fitRect returns the rect center at zoom 0 (finite and harmless). Callers in Phase 3 skip setViewport when getScreenSize() is 0×0.</dd>
+          <dt>Alternative</dt>
+          <dd>Pass the current viewport into fitRect, which would couple the pure function to canvas state.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>viewport-fit tests — round-trip zooms</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec listed round-trip zooms -2, 0, 1.5, and 3. The spike then found the canvas clamps zoom to [-4, 1].</dd>
+          <dt>Decision</dt>
+          <dd>Round-trip at -2, 0, 0.5, and 1, the valid range. Values above 1 are covered by the clamp test instead, since they can never be captured.</dd>
+          <dt>Alternative</dt>
+          <dd>Keep 1.5 and 3, which would fail the round trip by design.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>canvas-data — result type name</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec named the generic helper result <code>ReadResult&lt;T&gt;</code>.</dd>
+          <dt>Decision</dt>
+          <dd>Named it <code>KeyedRead&lt;T&gt;</code>, because path-model already exports a non-generic <code>ReadResult</code> and two types with the same name would be confusing.</dd>
+          <dt>Alternative</dt>
+          <dd>Reuse the name <code>ReadResult</code>.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>slide-model — addSlide trims</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec listed trimming only for renameSlide.</dd>
+          <dt>Decision</dt>
+          <dd>addSlide trims too, so names are normalized the same way however they are set.</dd>
+          <dt>Alternative</dt>
+          <dd>Store the name exactly as given on add.</dd>
+        </dl>
+      </section>
+    </main>
+  </body>
+</html>

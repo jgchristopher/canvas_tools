@@ -1,0 +1,166 @@
+<!doctype html>
+<!--
+  Implementation-notes shell — copied VERBATIM by execute-spec on the first logged entry.
+  This file is the single owner of the implementation-notes format. Do not restate its
+  structure or styles elsewhere; change the format here and every future phase inherits it.
+  Copier substitutes: 3 (phase number, twice), Canvas Presentation, 2026-10-25, Presentation mode and auto-play —
+  then deletes the example entry and appends real ones inside <main class="doc-content">.
+-->
+<html lang="en" data-theme="auto">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Implementation Notes — Phase 3</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f7f3;
+        --fg: #191b1d;
+        --muted: #50555a;
+        --border: #dededf;
+        --accent: #2b46c7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #131417;
+          --fg: #e9e9e4;
+          --muted: #a8aaa6;
+          --border: #2d3036;
+          --accent: #93a7ff;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0 auto;
+        max-width: 46rem;
+        padding: 2rem 1.25rem 4rem;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .doc-header { border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }
+      .doc-header h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+      .doc-meta { margin: 0; color: var(--muted); font-size: 0.875rem; }
+      .note-entry { border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+      .note-entry h3 { margin: 0 0 0.75rem; font-size: 1.05rem; color: var(--accent); }
+      .note-entry dl { margin: 0; }
+      .note-entry dt { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.75rem; }
+      .note-entry dt:first-child { margin-top: 0; }
+      .note-entry dd { margin: 0.15rem 0 0; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.9em;
+        background: color-mix(in srgb, var(--fg) 8%, transparent);
+        padding: 0.1em 0.3em;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="doc-header">
+      <h1>Implementation Notes — Phase 3</h1>
+      <p class="doc-meta">Canvas Presentation · 2026-10-25 · Presentation mode and auto-play</p>
+    </header>
+    <main class="doc-content">
+      <section class="note-entry">
+        <h3>Key capture — Scope plus window capture</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec left the capture point to the spike: a window-capture listener or an Obsidian Scope. The spike found that Obsidian&#39;s keymap listens at window capture from startup, so it always runs first.</dd>
+          <dt>Decision</dt>
+          <dd>Both. A pushed catch-all <code>Scope</code> performs the action and returns false. A window-capture listener only calls <code>stopPropagation</code> on consumed keys, so the canvas&#39;s bubble-phase Space handler never sees them.</dd>
+          <dt>Alternative</dt>
+          <dd>A window-capture listener alone, which would run after the keymap and could lose to a user hotkey bound to the same key.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Pointer blocking — items only</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec blocks pointer events on nodes, edges, and labels, and keeps panning empty canvas allowed.</dd>
+          <dt>Decision</dt>
+          <dd><code>LiveCanvas.isItemTarget()</code> (nodes, edges, labels) decides what is blocked. A drag on empty canvas can still draw a selection box, but nothing selected can be moved, nudged, or deleted, because node pointer events and edit keys are swallowed.</dd>
+          <dt>Alternative</dt>
+          <dd>Block every pointer event on the canvas, which would also kill touch panning on the phone.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Commands file location</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec listed command registration in <code>index.ts</code>.</dd>
+          <dt>Decision</dt>
+          <dd>Registered there with <code>checkCallback</code>, finding the slides controller for the active <code>FileView</code>.</dd>
+          <dt>Alternative</dt>
+          <dd>A separate commands module, which would need access to the per-view controller map.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Live check — synthetic keys</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>CLI eval can only send synthetic KeyboardEvents. Dispatching on <code>window</code> made the target the window itself, so the capture/bubble separation didn&#39;t apply.</dd>
+          <dt>Decision</dt>
+          <dd>Re-ran with events dispatched on <code>document.body</code>, matching real key presses. Space advanced the slide and did not start a pan. After exit, PageDown wasn&#39;t prevented and Space panned again.</dd>
+          <dt>Alternative</dt>
+          <dd>Trust the window-dispatched result, which falsely showed Space leaking.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Live check — no-write hash missed</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The temporary test canvas was deleted before its hash could be compared after presenting.</dd>
+          <dt>Decision</dt>
+          <dd>The no-write guarantee rests on <code>presentation-no-write.test.ts</code> and the Phase 1 live check that viewport changes cause 0 saves. John&#39;s Goal 4 shasum check covers it on a real canvas.</dd>
+          <dt>Alternative</dt>
+          <dd>Recreate the test canvas and repeat the run.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Review cycle 1 — app-global key capture (high)</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The reviewer found the Scope and window listener consumed keys app-wide, including in the command palette and other panes.</dd>
+          <dt>Decision</dt>
+          <dd>Added a pure <code>shouldHandleKey</code> guard (with unit tests). Keys are handled only when no modal is open, focus isn&#39;t in a text field, and the target is inside the presenting canvas, or is the body while that view is the active leaf. Verified live: typing Space and p into an outside input was not captured.</dd>
+          <dt>Alternative</dt>
+          <dd>Keep app-global capture.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Review cycle 1 — popouts, selection box, propagation</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The window listeners didn&#39;t cover popout windows, a drag on empty canvas could leave a rubber-band selection, and <code>stopPropagation</code> differed from the spec.</dd>
+          <dt>Decision</dt>
+          <dd>Listeners register on <code>root.win</code>. A WeakSet records keys the main-window Scope already handled, so the window listener acts only for keys it never saw (popouts). Selection is cleared on every pointerup on the canvas. The listener now uses <code>stopImmediatePropagation</code>.</dd>
+          <dt>Alternative</dt>
+          <dd>Leave popouts unsupported.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Mobile hide list deferred</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>The spec asked for any mobile canvas toolbar in the hide list. No phone is reachable from this session.</dd>
+          <dt>Decision</dt>
+          <dd>Desktop selectors only. Probe on John&#39;s phone during the hands-on gate, and add selectors if a canvas toolbar shows.</dd>
+          <dt>Alternative</dt>
+          <dd>Guess mobile class names.</dd>
+        </dl>
+      </section>
+      <section class="note-entry">
+        <h3>Live no-write check — hash artifact</h3>
+        <dl>
+          <dt>Context</dt>
+          <dd>A test canvas hash changed after a session. Tracing showed 0 requestSave calls during presenting. The change happened when the tab closed: Obsidian re-serializes the file in its own JSON formatting, and the test file had been written by Python with different whitespace.</dd>
+          <dt>Decision</dt>
+          <dd>Treated as a test-fixture artifact. Parsed content (keys, node order) was identical, and the presentation session itself caused 0 saves.</dd>
+          <dt>Alternative</dt>
+          <dd>Treat it as a plugin write.</dd>
+        </dl>
+      </section>
+    </main>
+  </body>
+</html>
